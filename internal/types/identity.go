@@ -5,6 +5,7 @@ import (
 
 	"github.com/dd-web/opforu-server/internal/utils"
 	gonanoid "github.com/matoous/go-nanoid/v2"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -45,4 +46,17 @@ func NewIdentity() *Identity {
 		Name:      name,
 		CreatedAt: time.Now().UTC(),
 	}
+}
+
+// takes a bson.M, marshals it into bytes then the bytes into a Identity struct
+func UnmarshalIdentity(d bson.M, t *Identity) error {
+	bs, err := bson.Marshal(d)
+	if err != nil {
+		return err
+	}
+	err = bson.Unmarshal(bs, t)
+	if err != nil {
+		return err
+	}
+	return nil
 }

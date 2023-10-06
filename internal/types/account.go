@@ -3,6 +3,7 @@ package types
 import (
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -45,4 +46,17 @@ func NewAccount() *Account {
 		Status:    AccountStatusActive,
 		CreatedAt: time.Now().UTC(),
 	}
+}
+
+// takes a bson.M, marshals it into bytes then the bytes into a Account struct
+func UnmarshalAccount(d bson.M, t *Account) error {
+	bs, err := bson.Marshal(d)
+	if err != nil {
+		return err
+	}
+	err = bson.Unmarshal(bs, t)
+	if err != nil {
+		return err
+	}
+	return nil
 }

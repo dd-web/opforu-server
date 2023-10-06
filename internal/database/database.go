@@ -76,23 +76,22 @@ func assertEnvStr(v string) string {
 // Constructs and runs and aggregation query on the specified collection/column using the supplied query config
 // always returns a slice, if looking for a single result use the first element
 // cannot be any type because primitive.M is not a comparable type
-func (s *Store) RunAggregation(col string, q utils.QueryConfig) ([]bson.M, error) {
+func (s *Store) RunAggregation(col string, q *utils.QueryConfig) ([]bson.M, error) {
 	collection := s.DB.Collection(col)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// @TODO: binary object constructor. ABSOLUTELY NECESARY - MUST be used for queries
-	// for now using a stand in bson.A to get it working
+	// bs := bson.A{builder.BsonD("$match", builder.BsonD("short", "gen"))}
+	bs := bson.A{builder.BsonOperator("$match", "short", "gen")}
+	// bs := bson.A{matcher}
 	// bs := bson.A{
-	// 	bson.D{{
-	// 		Key:   "$match",
-	// 		Value: bson.D{{Key: "short", Value: "g"}},
-	// 	}},
+	// bson.D{{"$match", bson.D{{"short", "gen"}}}},
 	// }
-	matcher := builder.BsonD("$match", "short", "g")
-	bs := bson.A{matcher}
 
+	fmt.Println("aggy: ", bs)
+	// [[ {$match [{short gen}] }]]
+	//  [[ {$match {short gen}}]]
 	cursor, err := collection.Aggregate(ctx, bs)
 	if err != nil {
 		return nil, err
@@ -102,12 +101,25 @@ func (s *Store) RunAggregation(col string, q utils.QueryConfig) ([]bson.M, error
 		cursor.Close(ctx)
 	}()
 
-	records := []bson.M{}
+	var records []bson.M
+
+	// for cursor.Next(ctx) {
+	// 	var record bson.M = bson.M{}
+	// 	err := cursor.Decode(&record)
+	// 	fmt.Println("result: ", record)
+	// 	if err != nil {
+	// 		fmt.Println("Error decoding result", err)
+	// 		continue
+	// 	}
+
+	// 	records = append(records, record)
+	// }
 
 	if err = cursor.All(ctx, &records); err != nil {
 		return nil, err
 	}
 
+	// fmt.Println("recs:", records)
 	return records, nil
 }
 
@@ -139,4 +151,44 @@ func (s *Store) SaveNewSingle(document any, col string) error {
 
 	fmt.Printf("Successfully saved document to %s column\n", col)
 	return nil
+}
+
+// Uses the query config object to find documents in the specified collection/column
+// returns a slice of bson.M, if it should be returned immediately it doesn't need to
+// be decoded into a struct and can be returned as is into the json response.
+// otherwise each model has an UnMarshal method that decodes it into a struct of that type.
+func (s *Store) Find(col string, cfg *utils.QueryConfig) ([]bson.M, error) {
+	collection := s.DB.Collection(col)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	findOpts := options.Find()
+	if cfg != nil {
+		findOpts.SetLimit(int64(cfg.Limit))
+		findOpts.SetSkip(int64(cfg.Skip))
+		findOpts.SetSort(cfg.Sort)
+	}
+
+	var results []bson.M = []bson.M{}
+
+	cursor, err := collection.Find(ctx, cfg.Filter, findOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		cursor.Close(ctx)
+	}()
+
+	for cursor.Next(ctx) {
+		var result bson.M
+		err := cursor.Decode(&result)
+		if err != nil {
+			fmt.Println("Error decoding result", err)
+			continue
+		}
+		results = append(results, result)
+	}
+
+	return results, nil
 }

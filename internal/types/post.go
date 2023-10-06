@@ -3,6 +3,7 @@ package types
 import (
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -34,4 +35,17 @@ func NewPost() *Post {
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
 	}
+}
+
+// takes a bson.M, marshals it into bytes then the bytes into a Post struct
+func UnmarshalPost(d bson.M, t *Post) error {
+	bs, err := bson.Marshal(d)
+	if err != nil {
+		return err
+	}
+	err = bson.Unmarshal(bs, t)
+	if err != nil {
+		return err
+	}
+	return nil
 }

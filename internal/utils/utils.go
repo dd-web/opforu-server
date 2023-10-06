@@ -121,18 +121,22 @@ type PageConfig struct {
 
 // analyzes the request and constructs a new page config object from it
 func NewPageConfig(r *http.Request) (*PageConfig, error) {
-	q := r.URL.Query()
+	current := 1
+	size := 10
 
-	current, err := strconv.Atoi(q.Get("page"))
-	if err != nil {
-		current = 1
+	if r != nil {
+		q := r.URL.Query()
+
+		currentInt, err := strconv.Atoi(q.Get("page"))
+		if err != nil {
+			current = currentInt
+		}
+
+		sizeInt, err := strconv.Atoi(q.Get("count"))
+		if err != nil {
+			size = sizeInt
+		}
 	}
-
-	size, err := strconv.Atoi(q.Get("count"))
-	if err != nil {
-		size = 10
-	}
-
 	return &PageConfig{
 		Current:  current,
 		PageSize: size,

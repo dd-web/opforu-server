@@ -1,8 +1,10 @@
 package types
 
 import (
+	"fmt"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -13,7 +15,7 @@ type Board struct {
 	Short       string `bson:"short" json:"short"` // short name for the board (used in URLs)
 	Description string `bson:"description" json:"description"`
 
-	Threads []primitive.ObjectID `bson:"threads" json:"threads"`
+	Threads []primitive.ObjectID `bson:"threads,omitempty" json:"threads"`
 
 	CreatedAt time.Time `bson:"created_at" json:"created_at"`
 	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
@@ -31,4 +33,22 @@ func NewBoard() *Board {
 		UpdatedAt: time.Now().UTC(),
 		PostRef:   0,
 	}
+}
+
+// takes a bson.M, marshals it into bytes then the bytes into a Board struct
+func UnmarshalBoard(d bson.M, t *Board) error {
+	fmt.Println("Unmarshalling board")
+
+	bs, err := bson.Marshal(d)
+	if err != nil {
+		return err
+	}
+
+	err = bson.Unmarshal(bs, t)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Finished unmarshalling board")
+	return nil
 }

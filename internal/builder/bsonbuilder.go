@@ -27,9 +27,9 @@ func BsonE(k string, v any) bson.E {
 }
 
 // Creates a bson.D with a single key/value pair of bson.E values
-func BsonD(op, k, v string) bson.D {
+func BsonD(k string, v any) bson.D {
 	return bson.D{
-		BsonE(op, BsonE(k, v)),
+		BsonE(k, v),
 	}
 
 	// just in case above breaks
@@ -81,4 +81,8 @@ func BsonProjection(keys []string, val int) bson.D {
 		Key:   "$project",
 		Value: projectVal,
 	}}
+}
+
+func BsonOperator(op string, k string, v any) bson.D {
+	return BsonD(op, BsonD(k, v))
 }

@@ -34,6 +34,37 @@ func main() {
 		log.Fatal(err)
 	}
 
+	queryConfig, err := utils.NewQueryConfig(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	storeAgg, err := store.RunAggregation("boards", queryConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var boardRes types.Board = types.Board{}
+	err = types.UnmarshalBoard(storeAgg[0], &boardRes)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// doc, err := bson.Marshal(storeAgg[0])
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	// err = bson.Unmarshal(doc, &boardRes)
+
+	// if err = types.UnMarshalBoard(storeAgg[0], &boardRes); err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	fmt.Println("BOARD!!!:", boardRes)
+	fmt.Println("board ID", boardRes.ID)
+	fmt.Println("board Title", boardRes.Title)
+
 	// to get rid of compile errors for now
 	fmt.Println("Store: ", store)
 
