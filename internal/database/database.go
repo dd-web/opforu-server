@@ -133,15 +133,24 @@ func (s *Store) SaveNewSingle(document any, col string) error {
 // be decoded into a struct and can be returned as is into the json response.
 // otherwise each model has an UnMarshal method that decodes it into a struct of that type.
 func (s *Store) Find(col string, cfg *utils.QueryConfig) ([]bson.M, error) {
+	matchCount, err := s.TotalRecordCount(col, cfg.Filter)
+	if err != nil {
+		fmt.Println("Error getting total record count", err)
+	}
+
+	if cfg.PageInfo != nil {
+		cfg.PageInfo.Update(int(matchCount))
+	}
+
 	collection := s.DB.Collection(col)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	findOpts := options.Find()
 	if cfg != nil {
-		findOpts.SetLimit(int64(cfg.Limit))
-		findOpts.SetSkip(int64(cfg.Skip))
-		findOpts.SetSort(cfg.Sort)
+		findOpts.SetLimit(cfg.Limit)
+		findOpts.SetSkip(cfg.Skip)
+		findOpts.SetSort(bson.M{cfg.Sort: cfg.Order})
 	}
 
 	var results []bson.M = []bson.M{}
@@ -166,4 +175,18 @@ func (s *Store) Find(col string, cfg *utils.QueryConfig) ([]bson.M, error) {
 	}
 
 	return results, nil
+}
+
+// get the total number of records in a collection
+func (s *Store) TotalRecordCount(col string, filter interface{}) (int64, error) {
+	countOpts := options.Count().SetMaxTime(2 * time.Second)
+	collection := s.DB.Collection(col)
+
+	count, err := collection.CountDocuments(context.Background(), filter, countOpts)
+	if err != nil {
+		fmt.Println("Error getting total record count", err)
+		return 0, err
+	}
+
+	return count, nil
 }

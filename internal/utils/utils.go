@@ -3,11 +3,13 @@ package utils
 import (
 	"crypto/aes"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var envKeys = []string{
@@ -83,24 +85,93 @@ func GetThreadSlugCharSet() string {
 }
 
 type QueryConfig struct {
-	Sort     bson.M
-	Limit    int
-	Skip     int
-	Filter   bson.M
-	PageInfo *PageConfig
+	Sort         string
+	Order        int
+	Limit        int64
+	Skip         int64
+	Search       bson.D
+	ResourceType string
+	Filter       any
+	PageInfo     *PageConfig
 }
 
 // constructs a new query config object from the request including page details
-func NewQueryConfig(r *http.Request) *QueryConfig {
-	p := NewPageConfig(r)
+// also takes a string for the resource type we're querying and paginating
+func NewQueryConfig(r *http.Request, rt string) *QueryConfig {
+	var anyFilter interface{} = new(interface{})
 
-	return &QueryConfig{
-		Sort:     bson.M{},
-		Limit:    p.PageSize,
-		Skip:     0,
-		Filter:   bson.M{},
-		PageInfo: p,
+	qc := &QueryConfig{
+		Sort:         "",
+		Order:        -1,
+		Limit:        10,
+		Skip:         0,
+		Search:       bson.D{},
+		ResourceType: rt,
+		Filter:       anyFilter,
 	}
+
+	var current int = 1
+	var size int = 10
+	var urlFilters map[string]any = make(map[string]any)
+
+	if r != nil {
+		URLQuery := r.URL.Query()
+		for k, v := range URLQuery {
+			switch k {
+			case "page":
+				currentInt, err := strconv.Atoi(v[0])
+				if err != nil {
+					fmt.Println("Error converting page to int", err)
+					break
+				}
+				current = currentInt
+			case "count":
+				sizeInt, err := strconv.Atoi(v[0])
+				if err != nil {
+					fmt.Println("Error converting count to int", err)
+					break
+				}
+				size = sizeInt
+			case "order":
+				orderInt, err := strconv.Atoi(v[0])
+				if err != nil {
+					fmt.Println("Error converting order to int", err)
+					break
+				}
+				qc.Order = orderInt
+			case "sort":
+				qc.Sort = v[0]
+			case "search":
+				// qc.Search = builder.BsonOperator("title", "$regex", primitive.Regex{Pattern: v[0]})
+				qc.Search = bson.D{{
+					Key: "title", Value: bson.D{{
+						Key:   "$regex",
+						Value: primitive.Regex{Pattern: v[0]},
+					}},
+				}}
+				// qc.Search += v[0]
+			default:
+				// qc.Filter = append(qc.Filter, builder.BsonD(k, v[0]))
+				urlFilters[k] = v[0]
+			}
+		}
+		qc.Skip = int64((current - 1) * size)
+		qc.Limit = int64(size)
+	}
+
+	// qc.Filter = builder.ComposeBsonD(urlFilters)
+
+	fmt.Println("Search:", qc.Search)
+	// for k, v := range urlFilters {
+
+	// }
+
+	qc.PageInfo = NewPageConfig(r, current, size)
+
+	// fmt.Println("QueryConfig", qc, qc.PageInfo, qc.Filters)
+	fmt.Println("Filters:", qc.Filter)
+
+	return qc
 }
 
 // helps paginate data
@@ -117,23 +188,7 @@ type PageConfig struct {
 }
 
 // analyzes the request and constructs a new page config object from it
-func NewPageConfig(r *http.Request) *PageConfig {
-	current := 1
-	size := 10
-
-	if r != nil {
-		q := r.URL.Query()
-
-		currentInt, err := strconv.Atoi(q.Get("page"))
-		if err != nil {
-			current = currentInt
-		}
-
-		sizeInt, err := strconv.Atoi(q.Get("count"))
-		if err != nil {
-			size = sizeInt
-		}
-	}
+func NewPageConfig(r *http.Request, current, size int) *PageConfig {
 	return &PageConfig{
 		Current:  current,
 		PageSize: size,

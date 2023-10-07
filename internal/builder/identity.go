@@ -17,3 +17,13 @@ func QrStrLookupIdentityMods() bson.D {
 	projection := bson.A{BsonProjection(publicIdentityFields, 1)}
 	return BsonLookup("identities", "mods", "_id", "mods", bson.D{}, projection)
 }
+
+//groups posts by identity, this way we can get the number of unique posters in a thread
+// use this on the post collection after it's been aggregated
+//  $group: {
+// 	_id: "$creator",
+// 	postCount: {
+// 		$count: {}
+// 	}
+// }
+//

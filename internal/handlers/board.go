@@ -11,6 +11,7 @@ import (
 	"github.com/dd-web/opforu-server/internal/database"
 	"github.com/dd-web/opforu-server/internal/types"
 	"github.com/dd-web/opforu-server/internal/utils"
+	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -18,11 +19,11 @@ import (
 /* path: host.com/api/board
 /***********************************************************************************************/
 func (rh *RoutingHandler) RegisterBoardRoot(w http.ResponseWriter, r *http.Request) error {
-	qCfg := utils.NewQueryConfig(r)
+	queryCfg := utils.NewQueryConfig(r, "threads")
 
 	switch r.Method {
 	case "GET":
-		return rh.handleBoardList(w, r, qCfg)
+		return rh.handleBoardList(w, r, queryCfg)
 	default:
 		return HandleUnsupportedMethod(w, r)
 	}
@@ -75,7 +76,7 @@ func (rh *RoutingHandler) handleBoardList(w http.ResponseWriter, r *http.Request
 /* path: host.com/api/board/{short}
 /***********************************************************************************************/
 func (rh *RoutingHandler) RegisterBoardShort(w http.ResponseWriter, r *http.Request) error {
-	qCfg := utils.NewQueryConfig(r)
+	qCfg := utils.NewQueryConfig(r, "threads")
 
 	switch r.Method {
 	case "GET":
@@ -87,25 +88,19 @@ func (rh *RoutingHandler) RegisterBoardShort(w http.ResponseWriter, r *http.Requ
 
 // GET: host.com/api/board/{short}
 func (rh *RoutingHandler) handleBoardShort(w http.ResponseWriter, r *http.Request, q *utils.QueryConfig) error {
-	bqstr := builder.QrStrPublicBoard("gen", 1, 10)
+	docCount, err := rh.Store.TotalRecordCount(q.ResourceType, q.Search)
+	if err != nil {
+		fmt.Println("Error getting total record count", err)
+	}
+	q.PageInfo.Update(int(docCount))
+
+	vars := mux.Vars(r)
+	bqstr := builder.QrStrPublicBoard(vars["short"], q)
 
 	boardbs, err := rh.Store.RunAggregation("boards", bqstr)
 	if err != nil {
 		return err
 	}
-
-	// var boards []types.Board
-	// for _, board := range boardbs {
-	// 	var result types.Board
-	// 	err := types.UnmarshalBoard(board, &result)
-	// 	if err != nil {
-	// 		fmt.Println("Error decoding result:", err)
-	// 		continue
-	// 	}
-	// 	boards = append(boards, result)
-	// }
-
-	// fmt.Println("BOARDS:", boards)
 
 	return HandleSendJSON(w, http.StatusOK, boardbs)
 }
