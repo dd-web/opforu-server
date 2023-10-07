@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/dd-web/opforu-server/internal/builder"
 	"github.com/dd-web/opforu-server/internal/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -76,23 +75,13 @@ func assertEnvStr(v string) string {
 // Constructs and runs and aggregation query on the specified collection/column using the supplied query config
 // always returns a slice, if looking for a single result use the first element
 // cannot be any type because primitive.M is not a comparable type
-func (s *Store) RunAggregation(col string, q *utils.QueryConfig) ([]bson.M, error) {
+func (s *Store) RunAggregation(col string, pipe interface{}) ([]bson.M, error) {
 	collection := s.DB.Collection(col)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// bs := bson.A{builder.BsonD("$match", builder.BsonD("short", "gen"))}
-	bs := bson.A{builder.BsonOperator("$match", "short", "gen")}
-	// bs := bson.A{matcher}
-	// bs := bson.A{
-	// bson.D{{"$match", bson.D{{"short", "gen"}}}},
-	// }
-
-	fmt.Println("aggy: ", bs)
-	// [[ {$match [{short gen}] }]]
-	//  [[ {$match {short gen}}]]
-	cursor, err := collection.Aggregate(ctx, bs)
+	cursor, err := collection.Aggregate(ctx, pipe)
 	if err != nil {
 		return nil, err
 	}
@@ -102,24 +91,10 @@ func (s *Store) RunAggregation(col string, q *utils.QueryConfig) ([]bson.M, erro
 	}()
 
 	var records []bson.M
-
-	// for cursor.Next(ctx) {
-	// 	var record bson.M = bson.M{}
-	// 	err := cursor.Decode(&record)
-	// 	fmt.Println("result: ", record)
-	// 	if err != nil {
-	// 		fmt.Println("Error decoding result", err)
-	// 		continue
-	// 	}
-
-	// 	records = append(records, record)
-	// }
-
 	if err = cursor.All(ctx, &records); err != nil {
 		return nil, err
 	}
 
-	// fmt.Println("recs:", records)
 	return records, nil
 }
 

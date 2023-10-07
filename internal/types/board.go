@@ -15,7 +15,7 @@ type Board struct {
 	Short       string `bson:"short" json:"short"` // short name for the board (used in URLs)
 	Description string `bson:"description" json:"description"`
 
-	Threads []primitive.ObjectID `bson:"threads,omitempty" json:"threads"`
+	Threads []any `bson:"threads,omitempty" json:"threads"`
 
 	CreatedAt time.Time `bson:"created_at" json:"created_at"`
 	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
@@ -28,7 +28,7 @@ type Board struct {
 func NewBoard() *Board {
 	return &Board{
 		ID:        primitive.NewObjectID(),
-		Threads:   []primitive.ObjectID{},
+		Threads:   []any{},
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
 		PostRef:   0,
@@ -41,11 +41,13 @@ func UnmarshalBoard(d bson.M, t *Board) error {
 
 	bs, err := bson.Marshal(d)
 	if err != nil {
+		fmt.Println("Error marshalling board:", err)
 		return err
 	}
 
 	err = bson.Unmarshal(bs, t)
 	if err != nil {
+		fmt.Println("Error unmarshalling board:", err)
 		return err
 	}
 

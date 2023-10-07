@@ -16,7 +16,18 @@
 
 package builder
 
-import "go.mongodb.org/mongo-driver/bson"
+import (
+	"go.mongodb.org/mongo-driver/bson"
+)
+
+// Create a bson.A - takes an array of any type, each will be inserted into the bson.A as itself
+func BsonA(vals []any) bson.A {
+	arr := bson.A{}
+	for _, k := range vals {
+		arr = append(arr, k)
+	}
+	return arr
+}
 
 // Creates a bson.E with the given key/value pair
 func BsonE(k string, v any) bson.E {
@@ -31,15 +42,6 @@ func BsonD(k string, v any) bson.D {
 	return bson.D{
 		BsonE(k, v),
 	}
-
-	// just in case above breaks
-	// return bson.D{{
-	// 	Key: op,
-	// 	Value: bson.D{{
-	// 		Key:   k,
-	// 		Value: v,
-	// 	}},
-	// }}
 }
 
 // Creates a bson.D including the given key/value pair map as bson.E values
@@ -83,6 +85,12 @@ func BsonProjection(keys []string, val int) bson.D {
 	}}
 }
 
+// returns a full bson.D pipeline object for a $match or other operators
 func BsonOperator(op string, k string, v any) bson.D {
 	return BsonD(op, BsonD(k, v))
+}
+
+// same as BsonOperator but for operators that take an array instead of k/v pair
+func BsonOperWithArray(op string, v []any) bson.D {
+	return BsonD(op, BsonA(v))
 }

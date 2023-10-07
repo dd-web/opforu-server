@@ -91,11 +91,8 @@ type QueryConfig struct {
 }
 
 // constructs a new query config object from the request including page details
-func NewQueryConfig(r *http.Request) (*QueryConfig, error) {
-	p, err := NewPageConfig(r)
-	if err != nil {
-		return nil, err
-	}
+func NewQueryConfig(r *http.Request) *QueryConfig {
+	p := NewPageConfig(r)
 
 	return &QueryConfig{
 		Sort:     bson.M{},
@@ -103,7 +100,7 @@ func NewQueryConfig(r *http.Request) (*QueryConfig, error) {
 		Skip:     0,
 		Filter:   bson.M{},
 		PageInfo: p,
-	}, nil
+	}
 }
 
 // helps paginate data
@@ -120,7 +117,7 @@ type PageConfig struct {
 }
 
 // analyzes the request and constructs a new page config object from it
-func NewPageConfig(r *http.Request) (*PageConfig, error) {
+func NewPageConfig(r *http.Request) *PageConfig {
 	current := 1
 	size := 10
 
@@ -140,7 +137,7 @@ func NewPageConfig(r *http.Request) (*PageConfig, error) {
 	return &PageConfig{
 		Current:  current,
 		PageSize: size,
-	}, nil
+	}
 }
 
 // takes in the total number of records (in the database) and updates the page config to reflect that

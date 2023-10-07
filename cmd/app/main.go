@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 
 	"github.com/dd-web/opforu-server/internal/database"
+	"github.com/dd-web/opforu-server/internal/handlers"
 	"github.com/dd-web/opforu-server/internal/types"
 	"github.com/dd-web/opforu-server/internal/utils"
 )
@@ -34,21 +35,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	queryConfig, err := utils.NewQueryConfig(nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// queryConfig := utils.NewQueryConfig(nil)
+	// storeAgg, err := store.RunAggregation("boards", queryConfig)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	storeAgg, err := store.RunAggregation("boards", queryConfig)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var boardRes types.Board = types.Board{}
-	err = types.UnmarshalBoard(storeAgg[0], &boardRes)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// var boardRes types.Board = types.Board{}
+	// err = types.UnmarshalBoard(storeAgg[0], &boardRes)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	// doc, err := bson.Marshal(storeAgg[0])
 	// if err != nil {
@@ -61,17 +58,17 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 
-	fmt.Println("BOARD!!!:", boardRes)
-	fmt.Println("board ID", boardRes.ID)
-	fmt.Println("board Title", boardRes.Title)
-
 	// to get rid of compile errors for now
-	fmt.Println("Store: ", store)
+	router := handlers.NewRoutingHandler(store)
 
-	router := mux.NewRouter()
+	srv := &http.Server{
+		Handler:      router.Router,
+		Addr:         "127.0.0.1:3001",
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+	}
 
-	// to get rid of compile errors for now
-	fmt.Println("Router: ", router)
+	log.Fatal(srv.ListenAndServe())
 
 	// router.HandleFunc("/api/v1/account", HandleWrapperFunc(handlers.AccountRoot(store)))
 
