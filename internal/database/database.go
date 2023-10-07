@@ -188,5 +188,7 @@ func (s *Store) TotalRecordCount(col string, filter interface{}) (int64, error) 
 		return 0, err
 	}
 
+	fmt.Println("Total record count:", count)
+
 	return count, nil
 }

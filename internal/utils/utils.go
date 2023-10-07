@@ -85,34 +85,33 @@ func GetThreadSlugCharSet() string {
 }
 
 type QueryConfig struct {
-	Sort         string
-	Order        int
-	Limit        int64
-	Skip         int64
-	Search       bson.D
-	ResourceType string
-	Filter       any
-	PageInfo     *PageConfig
+	Sort                 string
+	Order                int
+	Limit                int64
+	Skip                 int64
+	Search               bson.D
+	ResourceType         string
+	Filter               bson.D
+	PageInfo             *PageConfig
+	UnhandledQueryParams map[string]any
 }
 
 // constructs a new query config object from the request including page details
 // also takes a string for the resource type we're querying and paginating
 func NewQueryConfig(r *http.Request, rt string) *QueryConfig {
-	var anyFilter interface{} = new(interface{})
-
 	qc := &QueryConfig{
-		Sort:         "",
-		Order:        -1,
-		Limit:        10,
-		Skip:         0,
-		Search:       bson.D{},
-		ResourceType: rt,
-		Filter:       anyFilter,
+		Sort:                 "",
+		Order:                -1,
+		Limit:                10,
+		Skip:                 0,
+		Search:               bson.D{},
+		ResourceType:         rt,
+		Filter:               bson.D{},
+		UnhandledQueryParams: make(map[string]any),
 	}
 
 	var current int = 1
 	var size int = 10
-	var urlFilters map[string]any = make(map[string]any)
 
 	if r != nil {
 		URLQuery := r.URL.Query()
@@ -142,24 +141,29 @@ func NewQueryConfig(r *http.Request, rt string) *QueryConfig {
 			case "sort":
 				qc.Sort = v[0]
 			case "search":
-				// qc.Search = builder.BsonOperator("title", "$regex", primitive.Regex{Pattern: v[0]})
 				qc.Search = bson.D{{
 					Key: "title", Value: bson.D{{
 						Key:   "$regex",
 						Value: primitive.Regex{Pattern: v[0]},
 					}},
 				}}
-				// qc.Search += v[0]
 			default:
-				// qc.Filter = append(qc.Filter, builder.BsonD(k, v[0]))
-				urlFilters[k] = v[0]
+				qc.UnhandledQueryParams[k] = v[0]
 			}
 		}
 		qc.Skip = int64((current - 1) * size)
 		qc.Limit = int64(size)
 	}
 
-	// qc.Filter = builder.ComposeBsonD(urlFilters)
+	// @TODO: still need to add the constraints from the BSON constructor in the builder
+	// because right now it only gets the number of records without those constraints, which
+	// will give us invalid page counts -- been at this too long today though, FIX LATER
+	var flt bson.D = bson.D{}
+	for k, v := range qc.UnhandledQueryParams {
+		flt = append(flt, bson.E{Key: k, Value: v})
+	}
+
+	qc.Filter = flt
 
 	fmt.Println("Search:", qc.Search)
 	// for k, v := range urlFilters {
