@@ -88,14 +88,16 @@ func (rh *RoutingHandler) RegisterBoardShort(w http.ResponseWriter, r *http.Requ
 
 // GET: host.com/api/board/{short}
 func (rh *RoutingHandler) handleBoardShort(w http.ResponseWriter, r *http.Request, q *utils.QueryConfig) error {
-	docCount, err := rh.Store.TotalRecordCount(q.ResourceType, q.Search)
+	vars := mux.Vars(r)
+	// this still needs search constraints added to it - the record count is correct but results are unrestricted
+	bqstr := builder.QrStrPublicBoard(vars["short"], q)
+
+	threadMatches, err := rh.Store.CountThreadMatch(vars["short"], q.Search)
 	if err != nil {
 		fmt.Println("Error getting total record count", err)
 	}
-	q.PageInfo.Update(int(docCount))
 
-	vars := mux.Vars(r)
-	bqstr := builder.QrStrPublicBoard(vars["short"], q)
+	q.PageInfo.Update(int(threadMatches))
 
 	boardbs, err := rh.Store.RunAggregation("boards", bqstr)
 	if err != nil {

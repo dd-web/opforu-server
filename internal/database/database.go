@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/dd-web/opforu-server/internal/utils"
+	"github.com/dd-web/opforu-server/internal/types"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -75,7 +75,7 @@ func assertEnvStr(v string) string {
 // Constructs and runs and aggregation query on the specified collection/column using the supplied query config
 // always returns a slice, if looking for a single result use the first element
 // cannot be any type because primitive.M is not a comparable type
-func (s *Store) RunAggregation(col string, pipe interface{}) ([]bson.M, error) {
+func (s *Store) RunAggregation(col string, pipe any) ([]bson.M, error) {
 	collection := s.DB.Collection(col)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -132,63 +132,112 @@ func (s *Store) SaveNewSingle(document any, col string) error {
 // returns a slice of bson.M, if it should be returned immediately it doesn't need to
 // be decoded into a struct and can be returned as is into the json response.
 // otherwise each model has an UnMarshal method that decodes it into a struct of that type.
-func (s *Store) Find(col string, cfg *utils.QueryConfig) ([]bson.M, error) {
-	matchCount, err := s.TotalRecordCount(col, cfg.Filter)
-	if err != nil {
-		fmt.Println("Error getting total record count", err)
-	}
+// func (s *Store) Find(col string, cfg *utils.QueryConfig) ([]bson.M, error) {
+// 	matchCount, err := s.TotalRecordCount(col, cfg.Filter)
+// 	if err != nil {
+// 		fmt.Println("Error getting total record count", err)
+// 	}
 
-	if cfg.PageInfo != nil {
-		cfg.PageInfo.Update(int(matchCount))
-	}
+// 	if cfg.PageInfo != nil {
+// 		cfg.PageInfo.Update(int(matchCount))
+// 	}
 
-	collection := s.DB.Collection(col)
+// 	collection := s.DB.Collection(col)
+// 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// 	defer cancel()
+
+// 	findOpts := options.Find()
+// 	if cfg != nil {
+// 		findOpts.SetLimit(cfg.Limit)
+// 		findOpts.SetSkip(cfg.Skip)
+// 		findOpts.SetSort(bson.M{cfg.Sort: cfg.Order})
+// 	}
+
+// 	var results []bson.M = []bson.M{}
+
+// 	cursor, err := collection.Find(ctx, cfg.Filter, findOpts)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	defer func() {
+// 		cursor.Close(ctx)
+// 	}()
+
+// 	for cursor.Next(ctx) {
+// 		var result bson.M
+// 		err := cursor.Decode(&result)
+// 		if err != nil {
+// 			fmt.Println("Error decoding result", err)
+// 			continue
+// 		}
+// 		results = append(results, result)
+// 	}
+
+// 	return results, nil
+// }
+
+func (s *Store) FindBoardByShort(short string) (*types.Board, error) {
+	collection := s.DB.Collection("boards")
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	findOpts := options.Find()
-	if cfg != nil {
-		findOpts.SetLimit(cfg.Limit)
-		findOpts.SetSkip(cfg.Skip)
-		findOpts.SetSort(bson.M{cfg.Sort: cfg.Order})
-	}
-
-	var results []bson.M = []bson.M{}
-
-	cursor, err := collection.Find(ctx, cfg.Filter, findOpts)
+	var result types.Board
+	err := collection.FindOne(ctx, bson.D{{Key: "short", Value: short}}).Decode(&result)
 	if err != nil {
 		return nil, err
 	}
 
-	defer func() {
-		cursor.Close(ctx)
-	}()
-
-	for cursor.Next(ctx) {
-		var result bson.M
-		err := cursor.Decode(&result)
-		if err != nil {
-			fmt.Println("Error decoding result", err)
-			continue
-		}
-		results = append(results, result)
-	}
-
-	return results, nil
+	fmt.Println("Found board:", result)
+	return &result, nil
 }
 
-// get the total number of records in a collection
-func (s *Store) TotalRecordCount(col string, filter interface{}) (int64, error) {
-	countOpts := options.Count().SetMaxTime(2 * time.Second)
-	collection := s.DB.Collection(col)
+func (s *Store) CountThreadMatch(short string, filter bson.D) (int64, error) {
+	board, err := s.FindBoardByShort(short)
+	if err != nil {
+		fmt.Println("Error finding board by short", err)
+		return 0, err
+	}
 
-	count, err := collection.CountDocuments(context.Background(), filter, countOpts)
+	countOpts := options.Count().SetMaxTime(5 * time.Second)
+	collection := s.DB.Collection("threads")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	countFilter := bson.D{
+		{Key: "board", Value: board.ID},
+	}
+
+	countFilter = append(countFilter, filter...)
+
+	count, err := collection.CountDocuments(ctx, countFilter, countOpts)
 	if err != nil {
 		fmt.Println("Error getting total record count", err)
 		return 0, err
 	}
 
-	fmt.Println("Total record count:", count)
+	fmt.Println("Total matching records:", count)
 
 	return count, nil
 }
+
+// get the total number of records in a collection
+// func (s *Store) TotalRecordCount(col string, filter any) (int64, error) {
+// 	countOpts := options.Count().SetMaxTime(5 * time.Second).SetLimit(0).SetSkip(0)
+// 	collection := s.DB.Collection(col)
+
+// 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+// 	defer cancel()
+
+// 	count, err := collection.CountDocuments(ctx, filter, countOpts)
+// 	if err != nil {
+// 		fmt.Println("Error getting total record count", err)
+// 		return 0, err
+// 	}
+
+// 	fmt.Println("Total record count:", count)
+
+// 	return count, nil
+// }
