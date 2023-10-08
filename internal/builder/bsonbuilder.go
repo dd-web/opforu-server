@@ -71,7 +71,7 @@ func BsonLookup(col, pk, fk, as string, let bson.D, pipe bson.A) bson.D {
 }
 
 // Creates a $project bson obj with the given values as fields to include or exclude
-// ie: {"name": 1, "age": 1} would pass ["name", "age"], 1 to include those fields
+// ie: {"name": 1, "age": 1} would pass ["name", "age"], 1 to include those fields or -1 to exclude
 func BsonProjection(keys []string, val int) bson.D {
 	valM := make(map[string]any)
 	for _, v := range keys {

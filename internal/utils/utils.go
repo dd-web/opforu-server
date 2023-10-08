@@ -155,9 +155,6 @@ func NewQueryConfig(r *http.Request, rt string) *QueryConfig {
 		qc.Limit = int64(size)
 	}
 
-	// @TODO: still need to add the constraints from the BSON constructor in the builder
-	// because right now it only gets the number of records without those constraints, which
-	// will give us invalid page counts -- been at this too long today though, FIX LATER
 	var flt bson.D = bson.D{}
 	for k, v := range qc.UnhandledQueryParams {
 		flt = append(flt, bson.E{Key: k, Value: v})
