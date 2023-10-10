@@ -15,22 +15,23 @@ type Board struct {
 	Short       string `bson:"short" json:"short"` // short name for the board (used in URLs)
 	Description string `bson:"description" json:"description"`
 
-	Threads []any `bson:"threads,omitempty" json:"threads"`
+	Threads []primitive.ObjectID `bson:"threads,omitempty" json:"threads"`
 
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
-	DeletedAt time.Time `bson:"deleted_at" json:"deleted_at"`
+	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
+	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 
 	PostRef uint64 `bson:"post_ref" json:"post_ref"`
 }
 
 // Creates a new board with an ID and other default values.
 func NewBoard() *Board {
+	ts := time.Now().UTC()
 	return &Board{
 		ID:        primitive.NewObjectID(),
-		Threads:   []any{},
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
+		Threads:   []primitive.ObjectID{},
+		CreatedAt: &ts,
+		UpdatedAt: &ts,
 		PostRef:   0,
 	}
 }

@@ -8,28 +8,40 @@ import (
 )
 
 type Article struct {
-	ID        primitive.ObjectID   `bson:"_id,omitempty" json:"_id"`
+	ID primitive.ObjectID `bson:"_id,omitempty" json:"_id"`
+
 	AuthorID  primitive.ObjectID   `bson:"author" json:"author"`
 	CoAuthors []primitive.ObjectID `bson:"co_authors" json:"co_authors"`
 
-	// user content fields
-	Title string
-	Body  string
-	Slug  string
-	Tags  []string
+	Status ArticleStatus `bson:"status" json:"status"`
 
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
-	DeletedAt time.Time `bson:"deleted_at" json:"deleted_at"`
+	Title string   `bson:"title" json:"title"`
+	Body  string   `bson:"body" json:"body"`
+	Slug  string   `bson:"slug" json:"slug"`
+	Tags  []string `bson:"tags" json:"tags"`
+
+	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
+	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
+type ArticleStatus string
+
+const (
+	ArticleStatusDraft     ArticleStatus = "draft"
+	ArticleStatusPublished ArticleStatus = "published"
+	ArticleStatusArchived  ArticleStatus = "archived"
+	ArticleStatusDeleted   ArticleStatus = "deleted"
+)
+
 func NewArticle() *Article {
+	ts := time.Now().UTC()
 	return &Article{
 		ID:        primitive.NewObjectID(),
 		CoAuthors: []primitive.ObjectID{},
 		Tags:      []string{},
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
+		CreatedAt: &ts,
+		UpdatedAt: &ts,
 	}
 }
 

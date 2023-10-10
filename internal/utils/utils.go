@@ -145,7 +145,7 @@ func NewQueryConfig(r *http.Request, rt string) *QueryConfig {
 					Key: "title", Value: bson.D{{
 						Key:   "$regex",
 						Value: primitive.Regex{Pattern: v[0]},
-					}},
+					}, {Key: "$options", Value: "i"}},
 				}}
 			default:
 				qc.UnhandledQueryParams[k] = v[0]
@@ -163,9 +163,6 @@ func NewQueryConfig(r *http.Request, rt string) *QueryConfig {
 	qc.Filter = flt
 
 	fmt.Println("Search:", qc.Search)
-	// for k, v := range urlFilters {
-
-	// }
 
 	qc.PageInfo = NewPageConfig(r, current, size)
 

@@ -1,9 +1,13 @@
 package builder
 
-import "go.mongodb.org/mongo-driver/bson"
+import (
+	"github.com/dd-web/opforu-server/internal/utils"
+	"go.mongodb.org/mongo-driver/bson"
+)
 
-func QrStrLookupThread(sortBy string, sortDir, skip, limit int) bson.D {
+func QrStrLookupThread(sortBy string, sortDir, skip, limit int, q *utils.QueryConfig) bson.D {
 	pipe := bson.A{
+		BsonD("$match", q.Search),
 		BsonOperator("$addFields", "post_count", BsonD("$size", "$posts")),
 		BsonOperator("$sort", sortBy, sortDir),
 		BsonD("$skip", skip),
@@ -13,7 +17,7 @@ func QrStrLookupThread(sortBy string, sortDir, skip, limit int) bson.D {
 		BsonOperator("$addFields", "creator", BsonOperWithArray("$arrayElemAt", []interface{}{"$creator", 0})),
 		QrStrLookupIdentityMods(),
 		// lookup media here
-		BsonOperWithArray("$unset", []interface{}{"board"}),
+		BsonOperWithArray("$unset", []interface{}{"board", "account"}),
 	}
 
 	return BsonLookup("threads", "threads", "_id", "threads", BsonD("board", "$_id"), pipe)

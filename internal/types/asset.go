@@ -11,55 +11,47 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type PairedAsset[T comparable] struct {
-	Source    T `bson:"source" json:"source"`
-	Thumbnail T `bson:"thumbnail" json:"thumbnail"`
-}
-
-type AssetType string // an attempt to future proof if more asset types arise
-
-const (
-	AssetTypeImage AssetType = "image"
-	AssetTypeVideo AssetType = "video"
-)
-
 type AssetChecksum struct {
 	MD5    []byte `bson:"md5" json:"md5"`
 	SHA256 []byte `bson:"sha256" json:"sha256"`
 }
 
 type AssetAvatar struct {
+	ID primitive.ObjectID `bson:"_id" json:"_id"`
+
 	URL           string    `bson:"url" json:"url"`
 	FileExtension string    `bson:"file_extension" json:"file_extension"`
 	FileSize      int64     `bson:"file_size" json:"file_size"`
 	AssetType     AssetType `bson:"asset_type" json:"asset_type"`
 
-	Checksum AssetChecksum `bson:"checksum" json:"checksum"`
+	Checksum AssetChecksum `bson:"checksum,omitempty" json:"checksum,omitempty"`
 
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
-	DeletedAt time.Time `bson:"deleted_at" json:"deleted_at"`
+	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
+	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
 type AssetSource struct {
-	ID primitive.ObjectID `bson:"_id,omitempty" json:"_id"`
+	ID primitive.ObjectID `bson:"_id" json:"_id"`
 
-	FileSize      int         `bson:"file_size" json:"file_size"`
-	URL           string      `bson:"url" json:"url"`
-	AssetType     AssetType   `bson:"asset_type" json:"asset_type"`
-	Avatar        AssetAvatar `bson:"avatar" json:"avatar"`
-	FileExtension string      `bson:"file_extension" json:"file_extension"`
+	URL           string `bson:"url" json:"url"`
+	FileExtension string `bson:"file_extension" json:"file_extension"`
+	FileSize      int64  `bson:"file_size" json:"file_size"`
 
-	// list of accounts that have (or attmpted to) upload this asset
-	UploadedBy []primitive.ObjectID `bson:"uploaded_by" json:"uploaded_by"`
+	AssetType AssetType   `bson:"asset_type" json:"asset_type"`
+	Avatar    AssetAvatar `bson:"avatar,omitempty" json:"avatar,omitempty"`
+
+	UploaderIDs []primitive.ObjectID `bson:"uploaded_by" json:"uploaded_by"`
 
 	Checksum AssetChecksum `bson:"checksum" json:"checksum"`
 
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
-	DeletedAt time.Time `bson:"deleted_at" json:"deleted_at"`
+	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
+	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
+// this is what gets sent along in requests - if there is a duplicate AssetSource hash then we'll make a new
+// asset for the user and link it to the existing AssetSource
 type Asset struct {
 	ID     primitive.ObjectID `bson:"_id,omitempty" json:"_id"`
 	Source primitive.ObjectID `bson:"source" json:"source"`
@@ -72,9 +64,25 @@ type Asset struct {
 
 	Checksum AssetChecksum `bson:"checksum" json:"checksum"`
 
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
-	DeletedAt time.Time `bson:"deleted_at" json:"deleted_at"`
+	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
+	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
+}
+
+type AssetType string // an attempt to future proof if more asset types arise
+
+const (
+	AssetTypeImage AssetType = "image"
+	AssetTypeVideo AssetType = "video"
+)
+
+func NewAsset() *Asset {
+	ts := time.Now().UTC()
+	return &Asset{
+		ID:        primitive.NewObjectID(),
+		CreatedAt: &ts,
+		UpdatedAt: &ts,
+	}
 }
 
 // returns an md5 checksum of the file located at filename

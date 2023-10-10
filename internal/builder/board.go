@@ -17,6 +17,6 @@ func QrStrPublicBoard(short string, cfg *utils.QueryConfig) bson.A {
 	skip := (cfg.PageInfo.Current - 1) * cfg.PageInfo.PageSize
 	return bson.A{
 		BsonOperator("$match", "short", short),
-		QrStrLookupThread(sortField, cfg.Order, skip, cfg.PageInfo.PageSize),
+		QrStrLookupThread(sortField, cfg.Order, skip, cfg.PageInfo.PageSize, cfg),
 	}
 }

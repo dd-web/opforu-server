@@ -21,14 +21,15 @@ type Identity struct {
 
 	Thread primitive.ObjectID `bson:"thread,omitempty" json:"thread"`
 
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
-	DeletedAt time.Time `bson:"deleted_at" json:"deleted_at"`
+	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
+	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
 type IdentityStatus string
 
 const (
+	IdentityStatusUnknown   IdentityStatus = "unknown"
 	IdentityStatusActive    IdentityStatus = "active"
 	IdentityStatusSuspended IdentityStatus = "suspended"
 	IdentityStatusBanned    IdentityStatus = "banned"
@@ -37,6 +38,7 @@ const (
 
 // Creates a new Identity object with some values set by default
 func NewIdentity() *Identity {
+	ts := time.Now().UTC()
 	name, _ := gonanoid.Generate(utils.GetIdentityCharSet(), 8)
 
 	return &Identity{
@@ -44,7 +46,8 @@ func NewIdentity() *Identity {
 		Role:      ThreadRoleUser,
 		Status:    IdentityStatusActive,
 		Name:      name,
-		CreatedAt: time.Now().UTC(),
+		CreatedAt: &ts,
+		UpdatedAt: &ts,
 	}
 }
 

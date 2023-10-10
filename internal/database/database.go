@@ -72,9 +72,8 @@ func assertEnvStr(v string) string {
 	return v
 }
 
-// Constructs and runs and aggregation query on the specified collection/column using the supplied query config
-// always returns a slice, if looking for a single result use the first element
-// cannot be any type because primitive.M is not a comparable type
+// Runs the passed aggegation pipeline on the specified collection/column and returns the results
+// results must be a slice because bson.M is not a comparable type
 func (s *Store) RunAggregation(col string, pipe any) ([]bson.M, error) {
 	collection := s.DB.Collection(col)
 
@@ -128,55 +127,7 @@ func (s *Store) SaveNewSingle(document any, col string) error {
 	return nil
 }
 
-// Uses the query config object to find documents in the specified collection/column
-// returns a slice of bson.M, if it should be returned immediately it doesn't need to
-// be decoded into a struct and can be returned as is into the json response.
-// otherwise each model has an UnMarshal method that decodes it into a struct of that type.
-// func (s *Store) Find(col string, cfg *utils.QueryConfig) ([]bson.M, error) {
-// 	matchCount, err := s.TotalRecordCount(col, cfg.Filter)
-// 	if err != nil {
-// 		fmt.Println("Error getting total record count", err)
-// 	}
-
-// 	if cfg.PageInfo != nil {
-// 		cfg.PageInfo.Update(int(matchCount))
-// 	}
-
-// 	collection := s.DB.Collection(col)
-// 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-// 	defer cancel()
-
-// 	findOpts := options.Find()
-// 	if cfg != nil {
-// 		findOpts.SetLimit(cfg.Limit)
-// 		findOpts.SetSkip(cfg.Skip)
-// 		findOpts.SetSort(bson.M{cfg.Sort: cfg.Order})
-// 	}
-
-// 	var results []bson.M = []bson.M{}
-
-// 	cursor, err := collection.Find(ctx, cfg.Filter, findOpts)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	defer func() {
-// 		cursor.Close(ctx)
-// 	}()
-
-// 	for cursor.Next(ctx) {
-// 		var result bson.M
-// 		err := cursor.Decode(&result)
-// 		if err != nil {
-// 			fmt.Println("Error decoding result", err)
-// 			continue
-// 		}
-// 		results = append(results, result)
-// 	}
-
-// 	return results, nil
-// }
-
+// Finds a single Board document by it's short name, unmarshals it into a Board struct and returns a pointer to it
 func (s *Store) FindBoardByShort(short string) (*types.Board, error) {
 	collection := s.DB.Collection("boards")
 
@@ -189,10 +140,10 @@ func (s *Store) FindBoardByShort(short string) (*types.Board, error) {
 		return nil, err
 	}
 
-	fmt.Println("Found board:", result)
 	return &result, nil
 }
 
+// Finds the total number of threads matching the given filter
 func (s *Store) CountThreadMatch(short string, filter bson.D) (int64, error) {
 	board, err := s.FindBoardByShort(short)
 	if err != nil {
@@ -206,11 +157,7 @@ func (s *Store) CountThreadMatch(short string, filter bson.D) (int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	countFilter := bson.D{
-		{Key: "board", Value: board.ID},
-	}
-
-	countFilter = append(countFilter, filter...)
+	countFilter := append(bson.D{{Key: "board", Value: board.ID}}, filter...)
 
 	count, err := collection.CountDocuments(ctx, countFilter, countOpts)
 	if err != nil {
@@ -222,22 +169,3 @@ func (s *Store) CountThreadMatch(short string, filter bson.D) (int64, error) {
 
 	return count, nil
 }
-
-// get the total number of records in a collection
-// func (s *Store) TotalRecordCount(col string, filter any) (int64, error) {
-// 	countOpts := options.Count().SetMaxTime(5 * time.Second).SetLimit(0).SetSkip(0)
-// 	collection := s.DB.Collection(col)
-
-// 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-// 	defer cancel()
-
-// 	count, err := collection.CountDocuments(ctx, filter, countOpts)
-// 	if err != nil {
-// 		fmt.Println("Error getting total record count", err)
-// 		return 0, err
-// 	}
-
-// 	fmt.Println("Total record count:", count)
-
-// 	return count, nil
-// }

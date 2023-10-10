@@ -22,18 +22,19 @@ type Post struct {
 	Board  primitive.ObjectID `bson:"board" json:"board"`
 	Thread primitive.ObjectID `bson:"thread" json:"thread"`
 
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
-	DeletedAt time.Time `bson:"deleted_at" json:"deleted_at"`
+	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
+	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
 // Creates a new post with an ID and other default values.
 func NewPost() *Post {
+	ts := time.Now().UTC()
 	return &Post{
 		ID:        primitive.NewObjectID(),
 		Assets:    []primitive.ObjectID{},
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
+		CreatedAt: &ts,
+		UpdatedAt: &ts,
 	}
 }
 

@@ -12,8 +12,7 @@ type Thread struct {
 
 	Title string `bson:"title" json:"title"`
 	Body  string `bson:"body" json:"body"`
-
-	Slug string `bson:"slug" json:"slug"`
+	Slug  string `bson:"slug" json:"slug"`
 
 	Board primitive.ObjectID `bson:"board" json:"board"`
 
@@ -28,17 +27,18 @@ type Thread struct {
 
 	Flags []ThreadFlag `bson:"flags" json:"flags"`
 
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
-	DeletedAt time.Time `bson:"deleted_at" json:"deleted_at"`
+	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
+	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
 type ThreadStatus string
 
 const (
-	ThreadStatusOpen    ThreadStatus = "open"
-	ThreadStatusClosed  ThreadStatus = "closed"
-	ThreadStatusPending ThreadStatus = "pending"
+	ThreadStatusOpen     ThreadStatus = "open"
+	ThreadStatusClosed   ThreadStatus = "closed"
+	ThreadStatusArchived ThreadStatus = "archived"
+	ThreadStatusDeleted  ThreadStatus = "deleted"
 )
 
 type ThreadRole string

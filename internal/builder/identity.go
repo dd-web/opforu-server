@@ -18,6 +18,12 @@ func QrStrLookupIdentityMods() bson.D {
 	return BsonLookup("identities", "mods", "_id", "mods", bson.D{}, projection)
 }
 
+// query string for counting unique posters within a thread (partial agg pipeline, meant for internal pipeline usage)
+func QrStrGroupUniquePosters() bson.D {
+	pct := bson.D{{Key: "_id", Value: "$creator"}, {Key: "postCount", Value: BsonD("$count", nil)}}
+	return BsonD("$group", pct)
+}
+
 //groups posts by identity, this way we can get the number of unique posters in a thread
 // use this on the post collection after it's been aggregated
 //  $group: {
@@ -26,4 +32,3 @@ func QrStrLookupIdentityMods() bson.D {
 // 		$count: {}
 // 	}
 // }
-//
