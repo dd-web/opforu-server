@@ -89,19 +89,32 @@ func (rh *RoutingHandler) RegisterBoardShort(w http.ResponseWriter, r *http.Requ
 // GET: host.com/api/board/{short}
 func (rh *RoutingHandler) handleBoardShort(w http.ResponseWriter, r *http.Request, q *utils.QueryConfig) error {
 	vars := mux.Vars(r)
-	bpipe := builder.QrStrPublicBoard(vars["short"], q)
+	threadpipe, err := builder.QrStrLookupThreads(rh.Store.BoardIDs[vars["short"]], q)
+	if err != nil {
+		fmt.Println("Error building thread lookup pipeline", err)
+		return err
+	}
 
-	count, err := rh.Store.CountThreadMatch(vars["short"], q.Search)
+	count, err := rh.Store.CountThreadMatch(rh.Store.BoardIDs[vars["short"]], q.Search)
 	if err != nil {
 		fmt.Println("Error getting total record count", err)
+		return err
+	}
+
+	board, err := rh.Store.FindBoardByShort(vars["short"])
+	if err != nil {
+		fmt.Println("Error finding board by short", err)
+		return err
 	}
 
 	q.PageInfo.Update(int(count))
 
-	boardbs, err := rh.Store.RunAggregation("boards", bpipe)
+	threads, err := rh.Store.RunAggregation("threads", threadpipe)
 	if err != nil {
 		return err
 	}
 
-	return HandleSendJSON(w, http.StatusOK, boardbs)
+	q.PageInfo.Records = threads
+
+	return HandleSendJSON(w, http.StatusOK, bson.M{"board": board, "data": q.PageInfo})
 }

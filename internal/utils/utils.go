@@ -144,8 +144,8 @@ func NewQueryConfig(r *http.Request, rt string) *QueryConfig {
 				qc.Search = bson.D{{
 					Key: "title", Value: bson.D{{
 						Key:   "$regex",
-						Value: primitive.Regex{Pattern: v[0]},
-					}, {Key: "$options", Value: "i"}},
+						Value: primitive.Regex{Pattern: v[0], Options: "i"},
+					}},
 				}}
 			default:
 				qc.UnhandledQueryParams[k] = v[0]
@@ -155,18 +155,15 @@ func NewQueryConfig(r *http.Request, rt string) *QueryConfig {
 		qc.Limit = int64(size)
 	}
 
-	var flt bson.D = bson.D{}
+	var filter bson.D = bson.D{}
 	for k, v := range qc.UnhandledQueryParams {
-		flt = append(flt, bson.E{Key: k, Value: v})
+		filter = append(filter, bson.E{Key: k, Value: v})
 	}
 
-	qc.Filter = flt
-
-	fmt.Println("Search:", qc.Search)
-
+	qc.Filter = filter
 	qc.PageInfo = NewPageConfig(r, current, size)
 
-	// fmt.Println("QueryConfig", qc, qc.PageInfo, qc.Filters)
+	fmt.Println("Search:", qc.Search)
 	fmt.Println("Filters:", qc.Filter)
 
 	return qc
@@ -178,8 +175,8 @@ type PageConfig struct {
 	PageSize int `json:"page_size"`    // number of records per page
 	Total    int `json:"total_pages"`  // total number of pages
 
-	Records      []any `json:"records"`       // data the page contains
-	TotalRecords int   `json:"total_records"` // total number of records (determines total number of pages)
+	Records      []bson.M `json:"records"`       // data the page contains
+	TotalRecords int      `json:"total_records"` // total number of records (determines total number of pages)
 
 	IsLast        bool `json:"last_page"`      // is this the last page
 	LastPageCount int  `json:"last_page_size"` // number of records on the last page

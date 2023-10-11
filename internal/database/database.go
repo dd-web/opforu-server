@@ -9,6 +9,7 @@ import (
 
 	"github.com/dd-web/opforu-server/internal/types"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -17,6 +18,8 @@ type Store struct {
 	Client *mongo.Client
 	DB     *mongo.Database
 	Name   string
+
+	BoardIDs map[string]primitive.ObjectID
 
 	StartedAt time.Time
 	EndedAt   time.Time
@@ -49,6 +52,7 @@ func NewStore(name string) (*Store, error) {
 		Name:      name,
 		StartedAt: time.Now().UTC(),
 		EndedAt:   ended,
+		BoardIDs:  map[string]primitive.ObjectID{},
 	}, nil
 }
 
@@ -127,6 +131,33 @@ func (s *Store) SaveNewSingle(document any, col string) error {
 	return nil
 }
 
+func (s *Store) HydrateBoardIDs() error {
+	collection := s.DB.Collection("boards")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cursor, err := collection.Find(ctx, bson.M{})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		cursor.Close(ctx)
+	}()
+
+	for cursor.Next(ctx) {
+		var board types.Board
+		err := cursor.Decode(&board)
+		if err != nil {
+			fmt.Println("Error decoding board", err)
+			continue
+		}
+		s.BoardIDs[board.Short] = board.ID
+	}
+
+	return nil
+}
+
 // Finds a single Board document by it's short name, unmarshals it into a Board struct and returns a pointer to it
 func (s *Store) FindBoardByShort(short string) (*types.Board, error) {
 	collection := s.DB.Collection("boards")
@@ -140,24 +171,20 @@ func (s *Store) FindBoardByShort(short string) (*types.Board, error) {
 		return nil, err
 	}
 
+	result.Threads = []primitive.ObjectID{}
+
 	return &result, nil
 }
 
 // Finds the total number of threads matching the given filter
-func (s *Store) CountThreadMatch(short string, filter bson.D) (int64, error) {
-	board, err := s.FindBoardByShort(short)
-	if err != nil {
-		fmt.Println("Error finding board by short", err)
-		return 0, err
-	}
-
+func (s *Store) CountThreadMatch(boardId primitive.ObjectID, filter bson.D) (int64, error) {
 	countOpts := options.Count().SetMaxTime(5 * time.Second)
 	collection := s.DB.Collection("threads")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	countFilter := append(bson.D{{Key: "board", Value: board.ID}}, filter...)
+	countFilter := append(bson.D{{Key: "board", Value: boardId}}, filter...)
 
 	count, err := collection.CountDocuments(ctx, countFilter, countOpts)
 	if err != nil {

@@ -35,6 +35,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	err = store.HydrateBoardIDs()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// queryConfig := utils.NewQueryConfig(nil)
 	// storeAgg, err := store.RunAggregation("boards", queryConfig)
 	// if err != nil {

@@ -15,7 +15,7 @@ type Board struct {
 	Short       string `bson:"short" json:"short"` // short name for the board (used in URLs)
 	Description string `bson:"description" json:"description"`
 
-	Threads []primitive.ObjectID `bson:"threads,omitempty" json:"threads"`
+	Threads []primitive.ObjectID `bson:"threads,omitempty" json:"threads,omitempty"`
 
 	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
 	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
