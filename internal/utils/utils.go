@@ -162,10 +162,6 @@ func NewQueryConfig(r *http.Request, rt string) *QueryConfig {
 
 	qc.Filter = filter
 	qc.PageInfo = NewPageConfig(r, current, size)
-
-	fmt.Println("Search:", qc.Search)
-	fmt.Println("Filters:", qc.Filter)
-
 	return qc
 }
 
