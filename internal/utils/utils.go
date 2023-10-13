@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"crypto/aes"
-	"encoding/hex"
 	"fmt"
 	"net/http"
 	"os"
@@ -10,6 +8,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var envKeys = []string{
@@ -44,36 +43,6 @@ func AssertString(v string) string {
 	return v
 }
 
-// EncryptAES encrypts a string using AES encryption
-func EncryptAES(plaintext string, password string) (string, error) {
-	cypher, err := aes.NewCipher([]byte(password))
-	if err != nil {
-		return "", err
-	}
-
-	bs := make([]byte, len(plaintext))
-	cypher.Encrypt(bs, []byte(plaintext))
-
-	return hex.EncodeToString(bs), nil
-}
-
-// DecryptAES decrypts a string using AES encryption
-func DecryptAES(encrypted string, password string) (string, error) {
-	decoded, err := hex.DecodeString(encrypted)
-	if err != nil {
-		return "", err
-	}
-	cypher, err := aes.NewCipher([]byte(password))
-	if err != nil {
-		return "", err
-	}
-
-	bs := make([]byte, len(decoded))
-	cypher.Decrypt(bs, decoded)
-
-	return string(bs), nil
-}
-
 // Returns the character set used for generating identity IDs
 func GetIdentityCharSet() string {
 	return "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ123456789-_"
@@ -81,7 +50,7 @@ func GetIdentityCharSet() string {
 
 // Returns the character set used for generating thread slugs
 func GetThreadSlugCharSet() string {
-	return "abcdefghijklmnopqrstuvwxyz0123456789-_"
+	return "abcdefghijklmnopqrstuvwxyz0123456789"
 }
 
 type QueryConfig struct {
@@ -201,4 +170,23 @@ func (p *PageConfig) Update(count int) {
 	if p.Current == p.Total || p.Current >= p.Total || p.Total == 0 {
 		p.IsLast = true
 	}
+}
+
+// hashes a password with bcrypt
+func HashPassword(plaintext string) (string, error) {
+	hashed, err := bcrypt.GenerateFromPassword([]byte(plaintext), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hashed), nil
+}
+
+// compare a hashed password with plaintext
+func CompareHash(hashed, plaintext string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hashed), []byte(plaintext))
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	return true
 }

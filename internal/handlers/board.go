@@ -3,12 +3,10 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/dd-web/opforu-server/internal/builder"
-	"github.com/dd-web/opforu-server/internal/database"
 	"github.com/dd-web/opforu-server/internal/types"
 	"github.com/dd-web/opforu-server/internal/utils"
 	"github.com/gorilla/mux"
@@ -16,7 +14,7 @@ import (
 )
 
 /***********************************************************************************************/
-/* path: host.com/api/board
+/* ROOT path: host.com/api/board
 /***********************************************************************************************/
 func (rh *RoutingHandler) RegisterBoardRoot(w http.ResponseWriter, r *http.Request) error {
 	queryCfg := utils.NewQueryConfig(r, "threads")
@@ -29,14 +27,16 @@ func (rh *RoutingHandler) RegisterBoardRoot(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func getBoardList(s *database.Store) ([]types.Board, error) {
-	col := s.DB.Collection("boards")
+// GET: host.com/api/board
+func (rh *RoutingHandler) handleBoardList(w http.ResponseWriter, r *http.Request, q *utils.QueryConfig) error {
+	col := rh.Store.DB.Collection("boards")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	cursor, err := col.Find(ctx, bson.M{})
 	if err != nil {
-		return nil, err
+		fmt.Println("Error decoding board", err)
+		return HandleSendJSON(w, http.StatusInternalServerError, bson.M{"error": "unexpected server error"})
 	}
 
 	defer func() {
@@ -50,30 +50,16 @@ func getBoardList(s *database.Store) ([]types.Board, error) {
 		err := cursor.Decode(&board)
 		if err != nil {
 			fmt.Println("Error decoding board", err)
+			return HandleSendJSON(w, http.StatusInternalServerError, bson.M{"error": "unexpected server error"})
 		}
 		boards = append(boards, board)
-	}
-
-	if err = cursor.Err(); err != nil {
-		log.Println("Error decoding board", err)
-		return nil, err
-	}
-
-	return boards, nil
-}
-
-// GET: host.com/api/board
-func (rh *RoutingHandler) handleBoardList(w http.ResponseWriter, r *http.Request, q *utils.QueryConfig) error {
-	boards, err := getBoardList(rh.Store)
-	if err != nil {
-		return err
 	}
 
 	return HandleSendJSON(w, http.StatusOK, boards)
 }
 
 /***********************************************************************************************/
-/* path: host.com/api/board/{short}
+/* ROOT path: host.com/api/board/{short}
 /***********************************************************************************************/
 func (rh *RoutingHandler) RegisterBoardShort(w http.ResponseWriter, r *http.Request) error {
 	qCfg := utils.NewQueryConfig(r, "threads")

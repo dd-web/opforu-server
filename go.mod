@@ -3,6 +3,8 @@ module github.com/dd-web/opforu-server
 go 1.20
 
 require (
+	github.com/golang/gddo v0.0.0-20210115222349-20d68f94ee1f
+	github.com/google/uuid v1.3.1
 	github.com/gorilla/mux v1.8.0
 	github.com/joho/godotenv v1.5.1
 	github.com/matoous/go-nanoid/v2 v2.0.0

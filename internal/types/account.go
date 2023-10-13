@@ -15,6 +15,8 @@ type Account struct {
 	Role   AccountRole   `bson:"role" json:"role"`
 	Status AccountStatus `bson:"status" json:"status"`
 
+	Password string `json:"password_hash" bson:"password_hash"`
+
 	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
 	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
 	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
@@ -63,4 +65,16 @@ func UnmarshalAccount(d bson.M, t *Account) error {
 		return err
 	}
 	return nil
+}
+
+// format the account for the client
+func (a *Account) FormatForClient() bson.M {
+	return bson.M{
+		"username":   a.Username,
+		"email":      a.Email,
+		"role":       a.Role,
+		"status":     a.Status,
+		"created_at": a.CreatedAt,
+		"updated_at": a.UpdatedAt,
+	}
 }

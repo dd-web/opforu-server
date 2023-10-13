@@ -131,6 +131,7 @@ func (s *Store) SaveNewSingle(document any, col string) error {
 	return nil
 }
 
+// fetches and stores frequently used board data in memory for quicker access
 func (s *Store) HydrateBoardIDs() error {
 	collection := s.DB.Collection("boards")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -195,4 +196,66 @@ func (s *Store) CountThreadMatch(boardId primitive.ObjectID, filter bson.D) (int
 	fmt.Println("Total matching records:", count)
 
 	return count, nil
+}
+
+// find a session by it's session_id
+func (s *Store) FindSession(session string) (*types.Session, error) {
+	collection := s.DB.Collection("sessions")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var result types.Session
+	err := collection.FindOne(ctx, bson.D{{Key: "session_id", Value: session}}).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("Matching Session:", result)
+
+	return &result, nil
+}
+
+// find an account by it's _id
+func (s *Store) FindAccountByID(id primitive.ObjectID) (*types.Account, error) {
+	collection := s.DB.Collection("accounts")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var result types.Account
+	err := collection.FindOne(ctx, bson.D{{Key: "_id", Value: id}}).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// fins an account by it's username or email address
+func (s *Store) FindAccountByUsernameOrEmail(str string) (*types.Account, error) {
+	collection := s.DB.Collection("accounts")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var result types.Account
+	err := collection.FindOne(ctx, bson.D{{Key: "$or", Value: bson.A{bson.D{{Key: "username", Value: str}}, bson.D{{Key: "email", Value: str}}}}}).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// find an active session by it's account id
+func (s *Store) FindSessionFromUser(act primitive.ObjectID) (*types.Session, error) {
+	collection := s.DB.Collection("sessions")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var result types.Session
+	err := collection.FindOne(ctx, bson.D{{Key: "account", Value: act}, {Key: "active", Value: true}}).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
 }
