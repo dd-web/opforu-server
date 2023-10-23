@@ -55,12 +55,16 @@ func NewRoutingHandler(s *database.Store) *RoutingHandler {
 	fmt.Println("Registering routes...")
 	// accounts
 	rh.Router.HandleFunc("/api/account/login", WrapFn(rh.RegisterAccountLogin))
+	rh.Router.HandleFunc("/api/account/register", WrapFn(rh.RegisterAccountRegister))
 	rh.Router.HandleFunc("/api/account/me", WrapFn(rh.RegisterAccountMe))
 	rh.Router.HandleFunc("/api/account", WrapFn(rh.RegisterAccountRoot))
 
 	// boards
 	rh.Router.HandleFunc("/api/boards/{short}", WrapFn(rh.RegisterBoardShort))
 	rh.Router.HandleFunc("/api/boards", WrapFn(rh.RegisterBoardRoot))
+
+	// threads
+	rh.Router.HandleFunc("/api/threads/{slug}", WrapFn(rh.RegisterThreadRoot))
 
 	rh.Router.Use(mux.CORSMethodMiddleware(rh.Router))
 

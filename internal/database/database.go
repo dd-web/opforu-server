@@ -231,13 +231,19 @@ func (s *Store) FindAccountByID(id primitive.ObjectID) (*types.Account, error) {
 }
 
 // fins an account by it's username or email address
-func (s *Store) FindAccountByUsernameOrEmail(str string) (*types.Account, error) {
+// if email is empty string username will be supplied for both parameters
+func (s *Store) FindAccountByUsernameOrEmail(username string, email string) (*types.Account, error) {
 	collection := s.DB.Collection("accounts")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	var criteraTwo string = email
+	if email == "" {
+		criteraTwo = username
+	}
+
 	var result types.Account
-	err := collection.FindOne(ctx, bson.D{{Key: "$or", Value: bson.A{bson.D{{Key: "username", Value: str}}, bson.D{{Key: "email", Value: str}}}}}).Decode(&result)
+	err := collection.FindOne(ctx, bson.D{{Key: "$or", Value: bson.A{bson.D{{Key: "username", Value: username}}, bson.D{{Key: "email", Value: criteraTwo}}}}}).Decode(&result)
 	if err != nil {
 		return nil, err
 	}

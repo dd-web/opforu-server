@@ -8,24 +8,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func QrStrLookupThread(sortBy string, sortDir, skip, limit int, q *utils.QueryConfig) bson.D {
-	pipe := bson.A{
-		BsonD("$match", q.Search),
-		BsonOperator("$addFields", "post_count", BsonD("$size", "$posts")),
-		BsonOperator("$sort", sortBy, sortDir),
-		BsonD("$skip", skip),
-		BsonD("$limit", limit),
-		QrStrLookupPosts("post_number", 1, 5),
-		QrStrLookupIdentityCreator(),
-		BsonOperator("$addFields", "creator", BsonOperWithArray("$arrayElemAt", []interface{}{"$creator", 0})),
-		QrStrLookupIdentityMods(),
-		// lookup media here
-		BsonOperWithArray("$unset", []interface{}{"board", "account"}),
-	}
-
-	return BsonLookup("threads", "threads", "_id", "threads", BsonD("board", "$_id"), pipe)
-}
-
 // List of paginated thread previews for a board
 func QrStrLookupThreads(boardID primitive.ObjectID, cfg *utils.QueryConfig) (bson.A, error) {
 	if boardID == primitive.NilObjectID {
@@ -54,6 +36,19 @@ func QrStrLookupThreads(boardID primitive.ObjectID, cfg *utils.QueryConfig) (bso
 		BsonOperWithArray("$unset", []interface{}{"board", "account"}),
 		// lookup media here
 	}, nil
+}
+
+// a single thread with all posts populated
+func QrStrEntireThread(slug string, cfg *utils.QueryConfig) bson.A {
+	return bson.A{
+		BsonOperator("$match", "slug", slug),
+		QrStrLookupPosts("post_number", -1, 0),
+		QrStrLookupIdentityCreator(),
+		BsonOperator("$addFields", "creator", BsonOperWithArray("$arrayElemAt", []interface{}{"$creator", 0})),
+		QrStrLookupIdentityMods(),
+		BsonOperWithArray("$unset", []interface{}{"board", "account"}),
+		// lookup media here
+	}
 }
 
 // bson.A{
