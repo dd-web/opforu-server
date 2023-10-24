@@ -14,7 +14,7 @@ This will fetch any dependencies necessary for the project. Depending on which I
 
 ## Building
 
-We use _Makefile_'s to chain together and manage build/deployment processes. Check the ['Makefile'](http://github.com/dd-web/opforu-server/blob/master/Makefile) for more details.
+We use _Makefile_'s to chain together and manage build/deployment processes. Check the [`Makefile`](http://github.com/dd-web/opforu-server/blob/master/Makefile) for more details.
 
 To build the binary:
 
