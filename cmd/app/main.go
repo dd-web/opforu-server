@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 
-	"github.com/dd-web/opforu-server/internal/database"
 	"github.com/dd-web/opforu-server/internal/handlers"
+	"github.com/dd-web/opforu-server/internal/types"
 	"github.com/dd-web/opforu-server/internal/utils"
 )
 
@@ -20,7 +21,7 @@ func main() {
 	}
 	fmt.Println("Server starting up...")
 
-	store, err := database.NewStore("opforu_local_test")
+	store, err := types.NewStore("opforu_local_test")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -30,7 +31,29 @@ func main() {
 		log.Fatal(err)
 	}
 
-	router := handlers.NewRoutingHandler(store)
+	router := types.NewRoutingHandler(store)
+
+	handler_account := handlers.InitAccountHandlers(router)
+	handler_board := handlers.InitBoardHandler(router)
+	handler_thread := handlers.InitThreadHandler(router)
+
+	fmt.Println("Registering handlers...")
+
+	// account
+	router.Router.HandleFunc("/api/account/login", handlers.WrapFn(handler_account.RegisterAccountLogin))
+	router.Router.HandleFunc("/api/account/register", handlers.WrapFn(handler_account.RegisterAccountRegister))
+	router.Router.HandleFunc("/api/account/me", handlers.WrapFn(handler_account.RegisterAccountMe))
+	router.Router.HandleFunc("/api/account", handlers.WrapFn(handler_account.RegisterAccountRoot))
+
+	// boards
+	router.Router.HandleFunc("/api/boards/{short}", handlers.WrapFn(handler_board.RegisterBoardShort))
+	router.Router.HandleFunc("/api/boards", handlers.WrapFn(handler_board.RegisterBoardRoot))
+
+	// threads
+	router.Router.HandleFunc("/api/threads/{slug}", handlers.WrapFn(handler_thread.RegisterThreadRoot))
+
+	// request config
+	router.Router.Use(mux.CORSMethodMiddleware(router.Router))
 
 	srv := &http.Server{
 		Handler:      router.Router,
@@ -44,7 +67,7 @@ func main() {
 }
 
 // ResetDatabase drops the database and recreates it
-func ResetDatabase(s *database.Store) {
+func ResetDatabase(s *types.Store) {
 	if utils.IsProdEnv() {
 		log.Fatal("Will not reset database in production environment.")
 	}

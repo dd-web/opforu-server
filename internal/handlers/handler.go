@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/dd-web/opforu-server/internal/database"
 	"github.com/dd-web/opforu-server/internal/types"
-	"github.com/gorilla/mux"
 )
 
 type HandlerWrapperFunc func(rc *types.RequestCtx) error
@@ -20,6 +18,7 @@ func WrapFn(f HandlerWrapperFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// create request context here and pass in f()
 		reqctx := types.NewRequestCtx(w, r)
+		types.RequestLogger(reqctx)
 
 		if err := f(reqctx); err != nil {
 			fmt.Println("Error in handler:", err)
@@ -42,40 +41,7 @@ func HandleSendJSON(w http.ResponseWriter, status int, v any) error {
 	return json.NewEncoder(w).Encode(map[string]string{"error": "unknown server error"})
 }
 
-// top level router with access to the store for database operations
-type RoutingHandler struct {
-	Router *mux.Router
-	Store  *database.Store
-}
-
-// Creates a new route handler constructor with access to the store for database operations
-// the returned handler's router should be used as the main router for the server.
-func NewRoutingHandler(s *database.Store) *RoutingHandler {
-	r := mux.NewRouter()
-	rh := &RoutingHandler{
-		Router: r,
-		Store:  s,
-	}
-
-	fmt.Println("Registering routes...")
-	// accounts
-	rh.Router.HandleFunc("/api/account/login", WrapFn(rh.RegisterAccountLogin))
-	rh.Router.HandleFunc("/api/account/register", WrapFn(rh.RegisterAccountRegister))
-	rh.Router.HandleFunc("/api/account/me", WrapFn(rh.RegisterAccountMe))
-	rh.Router.HandleFunc("/api/account", WrapFn(rh.RegisterAccountRoot))
-
-	// boards
-	rh.Router.HandleFunc("/api/boards/{short}", WrapFn(rh.RegisterBoardShort))
-	rh.Router.HandleFunc("/api/boards", WrapFn(rh.RegisterBoardRoot))
-
-	// threads
-	rh.Router.HandleFunc("/api/threads/{slug}", WrapFn(rh.RegisterThreadRoot))
-
-	rh.Router.Use(mux.CORSMethodMiddleware(rh.Router))
-
-	return rh
-}
-
+// fallthrough handler for unsupported methods
 func HandleUnsupportedMethod(w http.ResponseWriter, r *http.Request) error {
 	return HandleSendJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "unsupported method"})
 }

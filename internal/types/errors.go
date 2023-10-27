@@ -1,13 +1,3 @@
-// for each type of error that we can handle, it should be defined. this way we know for sure what
-// we're sending back to the client and we can easily add new errors as we need them.
-//
-// if you have need for more error types, feel free to create as needed and add them to this file.
-// you can also create constructor funcs if you wish to make things a little easier.
-//
-// *WARNING* - Be CAREFUL. Returning unknown values to the client is a major security issue and an
-// error resulting from a third party package should NEVER be returned to the client without understanding
-// what it is and what it means. If you're not sure, don't return it.
-
 package types
 
 import "net/http"

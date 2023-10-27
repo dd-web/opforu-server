@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"golang.org/x/crypto/bcrypt"
@@ -56,4 +57,24 @@ func CompareHash(hashed, plaintext string) bool {
 		return false
 	}
 	return true
+}
+
+// constructs a connection string from env vars
+func ParseURIFromEnv() string {
+	if os.Getenv("MONGO_URI") != "" {
+		return os.Getenv("MONGO_URI")
+	}
+
+	return fmt.Sprintf("mongodb://%s:%s/",
+		AssertEnvStr(os.Getenv("DB_HOST")),
+		AssertEnvStr(os.Getenv("DB_PORT")),
+	)
+}
+
+// ensures the required string has a value
+func AssertEnvStr(v string) string {
+	if v == "" {
+		log.Fatal("Invalid Environemtn Variable")
+	}
+	return v
 }

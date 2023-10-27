@@ -1,13 +1,12 @@
-// This file contains mostly structures for request parsing or response formatting.
-// resolve as many details about the request as we can and pass to all handlers. this avoids
-// having to do it in every handler and keeps the handlers doing only their tasks.
 package types
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -15,6 +14,8 @@ import (
 // These define the valid resource paths for the API directly after root.
 type APIResource string
 
+// APIResource constants will by default be it's singular form. These will be modified when necessary
+// to their plural forms to match the database collection names.
 const (
 	Resource_Account  APIResource = "account"
 	Resource_Article  APIResource = "article"
@@ -34,6 +35,8 @@ type RequestCtx struct {
 	Resource   APIResource         // this is the main subroute of the API, the first major path after root.
 	Pagination *PageCtx            `json:"pages"`   // pagination information
 	Records    []bson.M            `json:"records"` // resource(s) we intend to return to the client
+	Store      *Store
+	AccountCtx *AccountCtx
 }
 
 // creates a new request context - parses and resolves request details into the context
@@ -42,13 +45,14 @@ func NewRequestCtx(w http.ResponseWriter, r *http.Request) *RequestCtx {
 	rc := &RequestCtx{
 		Request:    r,
 		Writer:     w,
-		Query:      NeqQueryCtx(),
+		Query:      NewQueryCtx(),
 		Resource:   APIResource(strings.Split(r.URL.Path, "/")[2]),
 		Pagination: NewPageCtx(),
 		Records:    []bson.M{},
 	}
 
 	rc.Resolve()
+	// rc.ResolveAccount()
 	return rc
 }
 
@@ -131,7 +135,7 @@ type QueryCtx struct {
 }
 
 // creates a new query context with default values
-func NeqQueryCtx() *QueryCtx {
+func NewQueryCtx() *QueryCtx {
 	return &QueryCtx{
 		Sort:                 "title",
 		Order:                -1,
@@ -190,5 +194,49 @@ type AccountCtx struct {
 func NewUserCtx() *AccountCtx {
 	return &AccountCtx{
 		Role: AccountRolePublic,
+	}
+}
+
+// chain creator
+func RequestLogger(rc *RequestCtx) {
+	fmt.Printf("[%s]: WHAT: %s - WHO: %s - %s\n", rc.Request.Method, rc.Request.URL.Path, rc.Request.RemoteAddr, rc.Request.UserAgent())
+}
+
+// populates the account context with the account and session information
+func (rc *RequestCtx) ResolveAccount() {
+	UnmarshalIntoSession(rc)
+
+}
+
+// body, err := io.ReadAll(rc.Request.Body)
+// if err != nil {
+// 	fmt.Println("Error parsing body", err)
+// 	return
+// }
+
+// // unmarshalling the request fields we want to process into a struct for easier access
+// var parsed struct {
+// 	Session string `json:"session"`
+// }
+
+// err = json.Unmarshal(body, &parsed)
+// if err != nil {
+// 	fmt.Println("Error unmarshalling body", err)
+// 	return
+// }
+
+// fmt.Printf("Parsed body:\n %v\n", parsed)
+
+// top level router with access to the store for database operations
+type RoutingHandler struct {
+	Router *mux.Router
+	Store  *Store
+}
+
+func NewRoutingHandler(s *Store) *RoutingHandler {
+	r := mux.NewRouter()
+	return &RoutingHandler{
+		Router: r,
+		Store:  s,
 	}
 }

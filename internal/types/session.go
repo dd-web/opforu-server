@@ -1,6 +1,9 @@
 package types
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
 	"time"
 
 	"github.com/google/uuid"
@@ -46,8 +49,6 @@ type Session struct {
 	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
-const ()
-
 func NewSession(userId primitive.ObjectID) *Session {
 	now := time.Now().UTC()
 	expires := time.Now().Add(time.Duration(SECONDS_IN_DAY) * time.Second).UTC() // 24 hours from now
@@ -74,4 +75,49 @@ func (s *Session) FormatForClient() bson.M {
 		"session_id": s.SessionID,
 		"expiry":     s.Expiry,
 	}
+}
+
+// for unmarshalling a session from the request into the session object to be passes down the chain
+func UnmarshalIntoSession(rc *RequestCtx) {
+	var err error
+
+	body, err := io.ReadAll(rc.Request.Body)
+	if err != nil {
+		fmt.Println("error reading body")
+		return
+	}
+
+	var parsed struct {
+		Session string `json:"session"`
+	}
+
+	err = json.Unmarshal(body, &parsed)
+	if err != nil {
+		fmt.Println("error unmarshalling body")
+		return
+	}
+
+	foundSession, err := rc.Store.FindSession(parsed.Session)
+	if err != nil {
+		return
+	}
+
+	if foundSession.IsExpired() {
+		fmt.Println("session expired")
+		return
+	}
+
+	account, err := rc.Store.FindAccountByID(foundSession.AccountID)
+	if err != nil {
+		fmt.Println("could not find the user account")
+		return
+	}
+
+	rc.AccountCtx.Account = account
+	rc.AccountCtx.Session = foundSession
+
+}
+
+func ResolveSessionFromCtx(rc *RequestCtx) *Session {
+	return NewSession(rc.AccountCtx.Account.ID)
 }

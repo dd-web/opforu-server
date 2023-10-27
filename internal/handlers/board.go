@@ -12,23 +12,40 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+type BoardHandler struct {
+	rc *types.RequestCtx
+	rh *types.RoutingHandler
+}
+
+func InitBoardHandler(rh *types.RoutingHandler) *BoardHandler {
+	return &BoardHandler{
+		rh: rh,
+	}
+}
+
+func (bh *BoardHandler) UpdateCtx(rc *types.RequestCtx) {
+	bh.rc = rc
+}
+
 /***********************************************************************************************/
 /* ROOT path: host.com/api/board
 /***********************************************************************************************/
-func (rh *RoutingHandler) RegisterBoardRoot(rc *types.RequestCtx) error {
+func (bh *BoardHandler) RegisterBoardRoot(rc *types.RequestCtx) error {
+	bh.UpdateCtx(rc)
 	// queryCfg := utils.NewQueryConfig(r, "threads")
 
 	switch rc.Request.Method {
 	case "GET":
-		return rh.handleBoardList(rc)
+		return bh.handleBoardList(rc)
 	default:
 		return HandleUnsupportedMethod(rc.Writer, rc.Request)
 	}
 }
 
 // GET: host.com/api/board
-func (rh *RoutingHandler) handleBoardList(rc *types.RequestCtx) error {
-	col := rh.Store.DB.Collection("boards")
+func (bh *BoardHandler) handleBoardList(rc *types.RequestCtx) error {
+	bh.UpdateCtx(rc)
+	col := bh.rh.Store.DB.Collection("boards")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -60,33 +77,35 @@ func (rh *RoutingHandler) handleBoardList(rc *types.RequestCtx) error {
 /***********************************************************************************************/
 /* ROOT path: host.com/api/board/{short}
 /***********************************************************************************************/
-func (rh *RoutingHandler) RegisterBoardShort(rc *types.RequestCtx) error {
+func (bh *BoardHandler) RegisterBoardShort(rc *types.RequestCtx) error {
+	bh.UpdateCtx(rc)
 	// qCfg := utils.NewQueryConfig(r, "threads")
 
 	switch rc.Request.Method {
 	case "GET":
-		return rh.handleBoardShort(rc)
+		return bh.handleBoardShort(rc)
 	default:
 		return HandleUnsupportedMethod(rc.Writer, rc.Request)
 	}
 }
 
 // GET: host.com/api/board/{short}
-func (rh *RoutingHandler) handleBoardShort(rc *types.RequestCtx) error {
+func (bh *BoardHandler) handleBoardShort(rc *types.RequestCtx) error {
+	bh.UpdateCtx(rc)
 	vars := mux.Vars(rc.Request)
-	threadpipe, err := builder.QrStrLookupThreads(rh.Store.BoardIDs[vars["short"]], rc.Query)
+	threadpipe, err := builder.QrStrLookupThreads(bh.rh.Store.BoardIDs[vars["short"]], rc.Query)
 	if err != nil {
 		fmt.Println("Error building thread lookup pipeline", err)
 		return err
 	}
 
-	count, err := rh.Store.CountThreadMatch(rh.Store.BoardIDs[vars["short"]], rc.Query.Search)
+	count, err := bh.rh.Store.CountThreadMatch(bh.rh.Store.BoardIDs[vars["short"]], rc.Query.Search)
 	if err != nil {
 		fmt.Println("Error getting total record count", err)
 		return err
 	}
 
-	board, err := rh.Store.FindBoardByShort(vars["short"])
+	board, err := bh.rh.Store.FindBoardByShort(vars["short"])
 	if err != nil {
 		fmt.Println("Error finding board by short", err)
 		return err
@@ -94,7 +113,7 @@ func (rh *RoutingHandler) handleBoardShort(rc *types.RequestCtx) error {
 
 	rc.Pagination.Update(int(count))
 
-	threads, err := rh.Store.RunAggregation("threads", threadpipe)
+	threads, err := bh.rh.Store.RunAggregation("threads", threadpipe)
 	if err != nil {
 		return err
 	}

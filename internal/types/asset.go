@@ -10,77 +10,82 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type AssetChecksum struct {
-	MD5    []byte `bson:"md5" json:"md5"`
-	SHA256 []byte `bson:"sha256" json:"sha256"`
-}
-
-type AssetAvatar struct {
-	ID primitive.ObjectID `bson:"_id" json:"_id"`
-
-	URL           string    `bson:"url" json:"url"`
-	FileExtension string    `bson:"file_extension" json:"file_extension"`
-	FileSize      int64     `bson:"file_size" json:"file_size"`
-	AssetType     AssetType `bson:"asset_type" json:"asset_type"`
-
-	Checksum AssetChecksum `bson:"checksum,omitempty" json:"checksum,omitempty"`
-
-	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
-	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
-}
-
-type AssetSource struct {
-	ID primitive.ObjectID `bson:"_id" json:"_id"`
-
-	URL           string `bson:"url" json:"url"`
-	FileExtension string `bson:"file_extension" json:"file_extension"`
-	FileSize      int64  `bson:"file_size" json:"file_size"`
-
-	AssetType AssetType   `bson:"asset_type" json:"asset_type"`
-	Avatar    AssetAvatar `bson:"avatar,omitempty" json:"avatar,omitempty"`
-
-	UploaderIDs []primitive.ObjectID `bson:"uploaded_by" json:"uploaded_by"`
-
-	Checksum AssetChecksum `bson:"checksum" json:"checksum"`
-
-	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
-	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
-}
-
-// this is what gets sent along in requests - if there is a duplicate AssetSource hash then we'll make a new
-// asset for the user and link it to the existing AssetSource
-type Asset struct {
-	ID     primitive.ObjectID `bson:"_id,omitempty" json:"_id"`
-	Source primitive.ObjectID `bson:"source" json:"source"`
-
-	UserFileName string      `bson:"user_file_name" json:"user_file_name"`
-	FileSize     int         `bson:"file_size" json:"file_size"`
-	URL          int         `bson:"url" json:"url"`
-	AssetType    AssetType   `bson:"asset_type" json:"asset_type"`
-	Avatar       AssetAvatar `bson:"avatar" json:"avatar"`
-
-	Checksum AssetChecksum `bson:"checksum" json:"checksum"`
-
-	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
-	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
-}
-
-type AssetType string // an attempt to future proof if more asset types arise
+// available asset types that can be uploaded - open for expansion
+type AssetType string
 
 const (
 	AssetTypeImage AssetType = "image"
 	AssetTypeVideo AssetType = "video"
 )
 
-func NewAsset() *Asset {
+// the internal source asset. This is a source file from which all other assets are derived. This should NEVER be passed
+// to the client unless they are an admin. This is for privacy and storage reasons. The derived asset should be
+// populated with the information the client needs from this source asset.
+type AssetSource struct {
+	ID primitive.ObjectID `json:"_id" bson:"_id"`
+
+	Details struct {
+		Avatar FileCtx `json:"avatar" bson:"avatar"`
+		Source FileCtx `json:"source" bson:"source"`
+	}
+
+	AssetType AssetType            `json:"asset_type" bson:"asset_type"`
+	Uploaders []primitive.ObjectID `json:"uploaders" bson:"uploaders"`
+
+	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
+	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
+}
+
+// the client level asset struct - assets are aggregated from asset sources with all the information they need.
+// if a user attempts to upload a file with an existing hash, instead it will not be uploaded and instead just an
+// Asset reference will be created. This is to prevent duplicate files from being uploaded and to let them name
+// their file whatever they want for their own organization.
+type Asset struct {
+	ID       primitive.ObjectID `json:"_id" bson:"_id"`
+	SourceID primitive.ObjectID `json:"source_id" bson:"source_id"`
+
+	AccountID primitive.ObjectID `json:"account_id" bson:"account_id"`
+
+	FileName string   `json:"file_name" bson:"file_name"`
+	Tags     []string `json:"tags" bson:"tags"`
+
+	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
+	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
+}
+
+// creates a new asset, must provide an asset source id from which to derive and the account id of who uploaded it (or owns it)
+func NewAsset(src primitive.ObjectID, acct primitive.ObjectID) *Asset {
 	ts := time.Now().UTC()
 	return &Asset{
 		ID:        primitive.NewObjectID(),
+		AccountID: acct,
+		SourceID:  src,
+		Tags:      []string{},
+		FileName:  "",
 		CreatedAt: &ts,
 		UpdatedAt: &ts,
+	}
+}
+
+// Details about the file, since files can have avatar and source files this is abstracted out. Both may not need all of these.
+type FileCtx struct {
+	Height    uint64 `json:"height" bson:"height"`
+	Width     uint64 `json:"width" bson:"width"`
+	FileSize  uint64 `json:"file_size" bson:"file_size"`
+	URL       string `json:"url" bson:"url"`
+	Extension string `json:"extension" bson:"extension"`
+}
+
+// a new file context
+func NewFileCtx() *FileCtx {
+	return &FileCtx{
+		Height:    0,
+		Width:     0,
+		FileSize:  0,
+		URL:       "",
+		Extension: "",
 	}
 }
 

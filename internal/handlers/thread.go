@@ -8,26 +8,43 @@ import (
 	"github.com/gorilla/mux"
 )
 
+type ThreadHandler struct {
+	rc *types.RequestCtx
+	rh *types.RoutingHandler
+}
+
+func InitThreadHandler(rh *types.RoutingHandler) *ThreadHandler {
+	return &ThreadHandler{
+		rh: rh,
+	}
+}
+
+func (th *ThreadHandler) UpdateCtx(rc *types.RequestCtx) {
+	th.rc = rc
+}
+
 /***********************************************************************************************/
 /* ROOT path: host.com/api/thread/{slug}
 /***********************************************************************************************/
-func (rh *RoutingHandler) RegisterThreadRoot(rc *types.RequestCtx) error {
+func (th *ThreadHandler) RegisterThreadRoot(rc *types.RequestCtx) error {
+	th.UpdateCtx(rc)
 	// queryCfg := utils.NewQueryConfig(r, "threads")
 
 	switch rc.Request.Method {
 	case "GET":
-		return rh.handleThreadRoot(rc)
+		return th.handleThreadRoot(rc)
 	default:
 		return HandleUnsupportedMethod(rc.Writer, rc.Request)
 	}
 }
 
 // GET: host.com/api/thread/{slug}
-func (rh *RoutingHandler) handleThreadRoot(rc *types.RequestCtx) error {
+func (th *ThreadHandler) handleThreadRoot(rc *types.RequestCtx) error {
+	th.UpdateCtx(rc)
 	vars := mux.Vars(rc.Request)
 	pipeline := builder.QrStrEntireThread(vars["slug"], rc.Query)
 
-	thread, err := rh.Store.RunAggregation("threads", pipeline)
+	thread, err := th.rh.Store.RunAggregation("threads", pipeline)
 	if err != nil {
 		return err
 	}
