@@ -3,10 +3,17 @@ package types
 import (
 	"time"
 
-	"github.com/dd-web/opforu-server/internal/utils"
 	gonanoid "github.com/matoous/go-nanoid/v2"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+var (
+	// character sets
+	IDENTITY_CHAR_SET = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ123456789-_"
+
+	// permissions
+	PUBLIC_IDENTITY_FIELDS   = []string{"name", "style", "role", "status", "thread", "created_at", "updated_at", "deleted_at"}
+	PERSONAL_IDENTITY_FIELDS = []string{"_id", "account"}
 )
 
 type Identity struct {
@@ -39,7 +46,7 @@ const (
 // Creates a new Identity object with some values set by default
 func NewIdentity() *Identity {
 	ts := time.Now().UTC()
-	name, _ := gonanoid.Generate(utils.GetIdentityCharSet(), 8)
+	name, _ := gonanoid.Generate(IDENTITY_CHAR_SET, 8)
 
 	return &Identity{
 		ID:        primitive.NewObjectID(),
@@ -49,17 +56,4 @@ func NewIdentity() *Identity {
 		CreatedAt: &ts,
 		UpdatedAt: &ts,
 	}
-}
-
-// takes a bson.M, marshals it into bytes then the bytes into a Identity struct
-func UnmarshalIdentity(d bson.M, t *Identity) error {
-	bs, err := bson.Marshal(d)
-	if err != nil {
-		return err
-	}
-	err = bson.Unmarshal(bs, t)
-	if err != nil {
-		return err
-	}
-	return nil
 }

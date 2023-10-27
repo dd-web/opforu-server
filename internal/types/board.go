@@ -1,11 +1,14 @@
 package types
 
 import (
-	"fmt"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+var (
+	// permissions
+	PUBLIC_BOARD_FIELDS = []string{"title", "short", "description", "threads", "created_at", "updated_at", "deleted_at"}
 )
 
 type Board struct {
@@ -34,24 +37,4 @@ func NewBoard() *Board {
 		UpdatedAt: &ts,
 		PostRef:   0,
 	}
-}
-
-// takes a bson.M, marshals it into bytes then the bytes into a Board struct
-func UnmarshalBoard(d bson.M, t *Board) error {
-	fmt.Println("Unmarshalling board")
-
-	bs, err := bson.Marshal(d)
-	if err != nil {
-		fmt.Println("Error marshalling board:", err)
-		return err
-	}
-
-	err = bson.Unmarshal(bs, t)
-	if err != nil {
-		fmt.Println("Error unmarshalling board:", err)
-		return err
-	}
-
-	fmt.Println("Finished unmarshalling board")
-	return nil
 }

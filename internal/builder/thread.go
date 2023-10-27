@@ -3,13 +3,13 @@ package builder
 import (
 	"fmt"
 
-	"github.com/dd-web/opforu-server/internal/utils"
+	"github.com/dd-web/opforu-server/internal/types"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // List of paginated thread previews for a board
-func QrStrLookupThreads(boardID primitive.ObjectID, cfg *utils.QueryConfig) (bson.A, error) {
+func QrStrLookupThreads(boardID primitive.ObjectID, cfg *types.QueryCtx) (bson.A, error) {
 	if boardID == primitive.NilObjectID {
 		fmt.Println("Cannot lookup threads with invalid board")
 		return nil, fmt.Errorf("invalid board")
@@ -39,7 +39,7 @@ func QrStrLookupThreads(boardID primitive.ObjectID, cfg *utils.QueryConfig) (bso
 }
 
 // a single thread with all posts populated
-func QrStrEntireThread(slug string, cfg *utils.QueryConfig) bson.A {
+func QrStrEntireThread(slug string, cfg *types.QueryCtx) bson.A {
 	return bson.A{
 		BsonOperator("$match", "slug", slug),
 		QrStrLookupPosts("post_number", -1, 0),

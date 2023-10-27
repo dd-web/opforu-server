@@ -3,8 +3,12 @@ package types
 import (
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+var (
+	// permissions
+	PUBLIC_ARTICLE_FIELDS = []string{"title", "body", "slug", "author", "co_authors", "status", "tags", "created_at", "updated_at", "deleted_at"}
 )
 
 type Article struct {
@@ -43,17 +47,4 @@ func NewArticle() *Article {
 		CreatedAt: &ts,
 		UpdatedAt: &ts,
 	}
-}
-
-// takes a bson.M, marshals it into bytes then the bytes into an Article struct
-func UnmarshalArticle(d bson.M, t *Article) error {
-	bs, err := bson.Marshal(d)
-	if err != nil {
-		return err
-	}
-	err = bson.Unmarshal(bs, t)
-	if err != nil {
-		return err
-	}
-	return nil
 }

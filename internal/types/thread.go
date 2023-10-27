@@ -3,8 +3,17 @@ package types
 import (
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+var (
+	// permissions
+	PUBLIC_THREAD_FIELDS = []string{"title", "body", "slug", "board", "creator", "posts", "mods", "status", "tags", "created_at", "updated_at", "deleted_at"}
+	MOD_THREAD_FIELDS    = []string{"flags"}
+	ADMIN_THREAD_FIELDS  = []string{"_id", "account"}
+
+	// character sets
+	THREAD_SLUG_CHAR_SET = "abcdefghijklmnopqrstuvwxyz0123456789"
 )
 
 type Thread struct {
@@ -57,16 +66,3 @@ const (
 	ThreadFlagLocked ThreadFlag = 1 << iota
 	ThreadFlagHidden ThreadFlag = 1 << iota
 )
-
-// takes a bson.M, marshals it into bytes then the bytes into a Thread struct
-func UnmarshalThread(d bson.M, t *Thread) error {
-	bs, err := bson.Marshal(d)
-	if err != nil {
-		return err
-	}
-	err = bson.Unmarshal(bs, t)
-	if err != nil {
-		return err
-	}
-	return nil
-}

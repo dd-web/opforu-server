@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -129,30 +128,4 @@ func GetFileSize(filename string) (int64, error) {
 	}
 
 	return file.Size(), nil
-}
-
-// takes a bson.M, marshals it into bytes then the bytes into a Asset struct
-func UnmarshalAsset(d bson.M, t *Asset) error {
-	bs, err := bson.Marshal(d)
-	if err != nil {
-		return err
-	}
-	err = bson.Unmarshal(bs, t)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// takes a bson.M, marshals it into bytes then the bytes into a AssetSource struct
-func UnmarshalAssetSource(d bson.M, t *AssetSource) error {
-	bs, err := bson.Marshal(d)
-	if err != nil {
-		return err
-	}
-	err = bson.Unmarshal(bs, t)
-	if err != nil {
-		return err
-	}
-	return nil
 }

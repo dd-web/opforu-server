@@ -6,10 +6,11 @@ import (
 	"net/http"
 
 	"github.com/dd-web/opforu-server/internal/database"
+	"github.com/dd-web/opforu-server/internal/types"
 	"github.com/gorilla/mux"
 )
 
-type HandlerWrapperFunc func(http.ResponseWriter, *http.Request) error
+type HandlerWrapperFunc func(rc *types.RequestCtx) error
 
 // All handlers are wrapped in this function to catch errors that may propagate.
 // it's responsible for catching the error and sending it to the client if it's
@@ -17,7 +18,10 @@ type HandlerWrapperFunc func(http.ResponseWriter, *http.Request) error
 // otherwise the response should be sent by the handler itself.
 func WrapFn(f HandlerWrapperFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := f(w, r); err != nil {
+		// create request context here and pass in f()
+		reqctx := types.NewRequestCtx(w, r)
+
+		if err := f(reqctx); err != nil {
 			fmt.Println("Error in handler:", err)
 			HandleSendJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
@@ -38,6 +42,7 @@ func HandleSendJSON(w http.ResponseWriter, status int, v any) error {
 	return json.NewEncoder(w).Encode(map[string]string{"error": "unknown server error"})
 }
 
+// top level router with access to the store for database operations
 type RoutingHandler struct {
 	Router *mux.Router
 	Store  *database.Store

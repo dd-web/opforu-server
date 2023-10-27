@@ -8,6 +8,30 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+var (
+	// measurements of time
+	SECONDS_IN_MINUTE = 60
+	MINUTES_IN_HOUR   = 60
+	HOURS_IN_DAY      = 24
+
+	DAYS_IN_WEEK = 7
+	DAYS_IN_YEAR = 365
+
+	SECONDS_IN_HOUR = SECONDS_IN_MINUTE * MINUTES_IN_HOUR
+	SECONDS_IN_DAY  = SECONDS_IN_HOUR * HOURS_IN_DAY
+	SECONDS_IN_WEEK = SECONDS_IN_DAY * DAYS_IN_WEEK
+
+	MINUTES_IN_DAY  = MINUTES_IN_HOUR * HOURS_IN_DAY
+	MINUTES_IN_WEEK = MINUTES_IN_DAY * DAYS_IN_WEEK
+
+	HOURS_IN_WEEK = HOURS_IN_DAY * DAYS_IN_WEEK
+	HOURS_IN_YEAR = HOURS_IN_DAY * DAYS_IN_YEAR
+
+	// permissions
+	PUBLIC_SESSION_FIELDS   = []string{"created_at", "updated_at", "deleted_at"}
+	PERSONAL_SESSION_FIELDS = []string{"_id", "account_id", "session_id", "active", "expiry"}
+)
+
 type Session struct {
 	ID primitive.ObjectID `bson:"_id,omitempty" json:"_id"`
 
@@ -22,15 +46,11 @@ type Session struct {
 	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
-const (
-	SECONDS_IN_HOUR = 3600
-	HOURS_IN_DAY    = 24
-	SECOND_IN_DAY   = SECONDS_IN_HOUR * HOURS_IN_DAY
-)
+const ()
 
 func NewSession(userId primitive.ObjectID) *Session {
 	now := time.Now().UTC()
-	expires := time.Now().Add(SECOND_IN_DAY * time.Second).UTC() // 24 hours from now
+	expires := time.Now().Add(time.Duration(SECONDS_IN_DAY) * time.Second).UTC() // 24 hours from now
 	id := uuid.New().String()
 	return &Session{
 		ID:        primitive.NewObjectID(),
