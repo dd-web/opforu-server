@@ -17,13 +17,13 @@ type HandlerWrapperFunc func(rc *types.RequestCtx) error
 func WrapFn(f HandlerWrapperFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// create request context here and pass in f()
-		reqctx := types.NewRequestCtx(w, r)
-		types.RequestLogger(reqctx)
+		rc := types.NewRequestCtx(w, r)
+		types.RequestLogger(rc)
 
 		// finally got the cookies working
-		fmt.Printf("Cookies: %v\n", reqctx.Request.Cookies())
+		fmt.Printf("Cookies: %v\n", rc.Request.Cookies())
 
-		if err := f(reqctx); err != nil {
+		if err := f(rc); err != nil {
 			fmt.Println("Error in handler:", err)
 			HandleSendJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
