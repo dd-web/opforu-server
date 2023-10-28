@@ -20,6 +20,9 @@ func WrapFn(f HandlerWrapperFunc) http.HandlerFunc {
 		reqctx := types.NewRequestCtx(w, r)
 		types.RequestLogger(reqctx)
 
+		// finally got the cookies working
+		fmt.Printf("Cookies: %v\n", reqctx.Request.Cookies())
+
 		if err := f(reqctx); err != nil {
 			fmt.Println("Error in handler:", err)
 			HandleSendJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})

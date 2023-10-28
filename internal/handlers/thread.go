@@ -9,7 +9,6 @@ import (
 )
 
 type ThreadHandler struct {
-	rc *types.RequestCtx
 	rh *types.RoutingHandler
 }
 
@@ -19,17 +18,10 @@ func InitThreadHandler(rh *types.RoutingHandler) *ThreadHandler {
 	}
 }
 
-func (th *ThreadHandler) UpdateCtx(rc *types.RequestCtx) {
-	th.rc = rc
-}
-
 /***********************************************************************************************/
 /* ROOT path: host.com/api/thread/{slug}
 /***********************************************************************************************/
 func (th *ThreadHandler) RegisterThreadRoot(rc *types.RequestCtx) error {
-	th.UpdateCtx(rc)
-	// queryCfg := utils.NewQueryConfig(r, "threads")
-
 	switch rc.Request.Method {
 	case "GET":
 		return th.handleThreadRoot(rc)
@@ -40,7 +32,6 @@ func (th *ThreadHandler) RegisterThreadRoot(rc *types.RequestCtx) error {
 
 // GET: host.com/api/thread/{slug}
 func (th *ThreadHandler) handleThreadRoot(rc *types.RequestCtx) error {
-	th.UpdateCtx(rc)
 	vars := mux.Vars(rc.Request)
 	pipeline := builder.QrStrEntireThread(vars["slug"], rc.Query)
 

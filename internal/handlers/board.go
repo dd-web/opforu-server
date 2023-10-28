@@ -13,7 +13,6 @@ import (
 )
 
 type BoardHandler struct {
-	rc *types.RequestCtx
 	rh *types.RoutingHandler
 }
 
@@ -23,16 +22,11 @@ func InitBoardHandler(rh *types.RoutingHandler) *BoardHandler {
 	}
 }
 
-func (bh *BoardHandler) UpdateCtx(rc *types.RequestCtx) {
-	bh.rc = rc
-}
-
 /***********************************************************************************************/
 /* ROOT path: host.com/api/board
 /***********************************************************************************************/
 func (bh *BoardHandler) RegisterBoardRoot(rc *types.RequestCtx) error {
-	bh.UpdateCtx(rc)
-	// queryCfg := utils.NewQueryConfig(r, "threads")
+	rc.UpdateStore(bh.rh.Store)
 
 	switch rc.Request.Method {
 	case "GET":
@@ -44,8 +38,7 @@ func (bh *BoardHandler) RegisterBoardRoot(rc *types.RequestCtx) error {
 
 // GET: host.com/api/board
 func (bh *BoardHandler) handleBoardList(rc *types.RequestCtx) error {
-	bh.UpdateCtx(rc)
-	col := bh.rh.Store.DB.Collection("boards")
+	col := rc.Store.DB.Collection("boards")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -78,8 +71,7 @@ func (bh *BoardHandler) handleBoardList(rc *types.RequestCtx) error {
 /* ROOT path: host.com/api/board/{short}
 /***********************************************************************************************/
 func (bh *BoardHandler) RegisterBoardShort(rc *types.RequestCtx) error {
-	bh.UpdateCtx(rc)
-	// qCfg := utils.NewQueryConfig(r, "threads")
+	rc.UpdateStore(bh.rh.Store)
 
 	switch rc.Request.Method {
 	case "GET":
@@ -91,21 +83,21 @@ func (bh *BoardHandler) RegisterBoardShort(rc *types.RequestCtx) error {
 
 // GET: host.com/api/board/{short}
 func (bh *BoardHandler) handleBoardShort(rc *types.RequestCtx) error {
-	bh.UpdateCtx(rc)
 	vars := mux.Vars(rc.Request)
-	threadpipe, err := builder.QrStrLookupThreads(bh.rh.Store.BoardIDs[vars["short"]], rc.Query)
+	threadpipe, err := builder.QrStrLookupThreads(rc.Store.BoardIDs[vars["short"]], rc.Query)
+
 	if err != nil {
 		fmt.Println("Error building thread lookup pipeline", err)
 		return err
 	}
 
-	count, err := bh.rh.Store.CountThreadMatch(bh.rh.Store.BoardIDs[vars["short"]], rc.Query.Search)
+	count, err := rc.Store.CountThreadMatch(rc.Store.BoardIDs[vars["short"]], rc.Query.Search)
 	if err != nil {
 		fmt.Println("Error getting total record count", err)
 		return err
 	}
 
-	board, err := bh.rh.Store.FindBoardByShort(vars["short"])
+	board, err := rc.Store.FindBoardByShort(vars["short"])
 	if err != nil {
 		fmt.Println("Error finding board by short", err)
 		return err
@@ -113,7 +105,7 @@ func (bh *BoardHandler) handleBoardShort(rc *types.RequestCtx) error {
 
 	rc.Pagination.Update(int(count))
 
-	threads, err := bh.rh.Store.RunAggregation("threads", threadpipe)
+	threads, err := rc.Store.RunAggregation("threads", threadpipe)
 	if err != nil {
 		return err
 	}

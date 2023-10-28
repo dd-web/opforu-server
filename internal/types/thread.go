@@ -58,11 +58,13 @@ const (
 	ThreadRoleCreator ThreadRole = "creator"
 )
 
+// Bitfield flags for threads
 type ThreadFlag uint
 
 const (
-	ThreadFlagNone   ThreadFlag = iota
-	ThreadFlagSticky ThreadFlag = 1 << iota
-	ThreadFlagLocked ThreadFlag = 1 << iota
-	ThreadFlagHidden ThreadFlag = 1 << iota
+	ThreadFlagNone   ThreadFlag = iota      // thread has no flags
+	ThreadFlagSticky ThreadFlag = 1 << iota // thread is sticky
+	ThreadFlagLocked ThreadFlag = 1 << iota // thread is locked
+	ThreadFlagHidden ThreadFlag = 1 << iota // thread is hidden
+	ThreadFlagNSFW   ThreadFlag = 1 << iota // thread is NSFW
 )

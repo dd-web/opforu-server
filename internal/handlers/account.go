@@ -12,7 +12,6 @@ import (
 )
 
 type AccountHandler struct {
-	rc *types.RequestCtx
 	rh *types.RoutingHandler
 }
 
@@ -22,17 +21,10 @@ func InitAccountHandlers(rh *types.RoutingHandler) *AccountHandler {
 	}
 }
 
-func (ah *AccountHandler) UpdateCtx(rc *types.RequestCtx) {
-	ah.rc = rc
-}
-
 /***********************************************************************************************/
 /* ROOT path: host.com/api/account
 /***********************************************************************************************/
 func (ah *AccountHandler) RegisterAccountRoot(rc *types.RequestCtx) error {
-	ah.UpdateCtx(rc)
-	// qCfg := utils.NewQueryConfig(r, "accounts")
-
 	switch rc.Request.Method {
 	case "GET":
 		return ah.handleGetAccount(rc)
@@ -43,7 +35,6 @@ func (ah *AccountHandler) RegisterAccountRoot(rc *types.RequestCtx) error {
 
 // GET: host.com/api/account
 func (ah *AccountHandler) handleGetAccount(rc *types.RequestCtx) error {
-	// fmt.Println("Account handler", q)
 	return HandleSendJSON(rc.Writer, http.StatusOK, bson.M{"message": "account handler"})
 }
 
@@ -51,10 +42,6 @@ func (ah *AccountHandler) handleGetAccount(rc *types.RequestCtx) error {
 /* ROOT path: host.com/api/account/login
 /***********************************************************************************************/
 func (ah *AccountHandler) RegisterAccountLogin(rc *types.RequestCtx) error {
-	ah.UpdateCtx(rc)
-	// qCfg := utils.NewQueryConfig(r, "accounts")
-	fmt.Println("HELLOO!??")
-
 	switch rc.Request.Method {
 	case "POST":
 		return ah.handlePostAccountLogin(rc)
@@ -65,8 +52,6 @@ func (ah *AccountHandler) RegisterAccountLogin(rc *types.RequestCtx) error {
 
 // POST: host.com/api/account/login
 func (ah *AccountHandler) handlePostAccountLogin(rc *types.RequestCtx) error {
-	ah.UpdateCtx(rc)
-
 	body, err := io.ReadAll(rc.Request.Body)
 	if err != nil {
 		fmt.Println("Error reading body", err)
@@ -99,7 +84,7 @@ func (ah *AccountHandler) handlePostAccountLogin(rc *types.RequestCtx) error {
 
 	session := types.NewSession(account.ID)
 
-	err = ah.rh.Store.SaveNewSingle(session, "sessions")
+	err = rc.Store.SaveNewSingle(session, "sessions")
 	if err != nil {
 		fmt.Println("Error saving new session", err)
 		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"})
@@ -117,9 +102,6 @@ func (ah *AccountHandler) handlePostAccountLogin(rc *types.RequestCtx) error {
 /* ROOT path: host.com/api/account/register
 /***********************************************************************************************/
 func (ah *AccountHandler) RegisterAccountRegister(rc *types.RequestCtx) error {
-	ah.UpdateCtx(rc)
-	// qCfg := utils.NewQueryConfig(r, "accounts")
-
 	switch rc.Request.Method {
 	case "POST":
 		return ah.handlePostAccountRegister(rc)
@@ -130,8 +112,6 @@ func (ah *AccountHandler) RegisterAccountRegister(rc *types.RequestCtx) error {
 
 // POST: host.com/api/account/register
 func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error {
-	ah.UpdateCtx(rc)
-
 	body, err := io.ReadAll(rc.Request.Body)
 	if err != nil {
 		fmt.Println("Error reading body", err)
@@ -151,7 +131,7 @@ func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error 
 		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"})
 	}
 
-	account, err := ah.rh.Store.FindAccountByUsernameOrEmail(parsed.Username, parsed.Email)
+	account, err := rc.Store.FindAccountByUsernameOrEmail(parsed.Username, parsed.Email)
 	if err != nil {
 		fmt.Println("This isn't really an error, this is what we want (no accounts with existing username or email)", err)
 	}
@@ -167,13 +147,13 @@ func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error 
 
 	session := types.NewSession(newAccount.ID)
 
-	err = ah.rh.Store.SaveNewSingle(newAccount, "accounts")
+	err = rc.Store.SaveNewSingle(newAccount, "accounts")
 	if err != nil {
 		fmt.Println("Error saving new account", err)
 		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"})
 	}
 
-	err = ah.rh.Store.SaveNewSingle(session, "sessions")
+	err = rc.Store.SaveNewSingle(session, "sessions")
 	if err != nil {
 		fmt.Println("Error saving new session", err)
 		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"})
@@ -191,9 +171,6 @@ func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error 
 /* ROOT path: host.com/api/account/me
 /***********************************************************************************************/
 func (ah *AccountHandler) RegisterAccountMe(rc *types.RequestCtx) error {
-	ah.UpdateCtx(rc)
-	// qCfg := utils.NewQueryConfig(, "accounts")
-
 	switch rc.Request.Method {
 	case "POST":
 		return ah.handlePostAccountMe(rc)
@@ -204,10 +181,8 @@ func (ah *AccountHandler) RegisterAccountMe(rc *types.RequestCtx) error {
 
 // POST: host.com/api/account/me
 func (ah *AccountHandler) handlePostAccountMe(rc *types.RequestCtx) error {
-	ah.UpdateCtx(rc)
 	body, err := io.ReadAll(rc.Request.Body)
 	if err != nil {
-		fmt.Println("Error reading body", err)
 		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"})
 	}
 
@@ -217,13 +192,11 @@ func (ah *AccountHandler) handlePostAccountMe(rc *types.RequestCtx) error {
 
 	err = json.Unmarshal(body, &parsed)
 	if err != nil {
-		fmt.Println("Error parsing body", err)
 		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"})
 	}
 
 	session, err := rc.Store.FindSession(parsed.Session)
 	if err != nil {
-		// fmt.Println("Error finding session", err)
 		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid session"})
 	}
 

@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -41,44 +41,59 @@ type Session struct {
 	SessionID string             `bson:"session_id" json:"session_id"`
 	AccountID primitive.ObjectID `bson:"account_id" json:"account_id"`
 
-	Active bool `bson:"active" json:"active"`
+	CookieType CookieVariant `bson:"cookie_type" json:"cookie_type"`
 
-	Expiry    *time.Time `bson:"expiry" json:"expiry"`
+	Flags []SessionFlag `bson:"flags" json:"flags"`
+
+	Cookie *http.Cookie `bson:"-" json:"-"`
+
 	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
 	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
 	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
 func NewSession(userId primitive.ObjectID) *Session {
-	now := time.Now().UTC()
-	expires := time.Now().Add(time.Duration(SECONDS_IN_DAY) * time.Second).UTC() // 24 hours from now
-	id := uuid.New().String()
+	cookie := NewSessionCookie()
+	ts := time.Now().UTC()
 	return &Session{
-		ID:        primitive.NewObjectID(),
-		AccountID: userId,
-		SessionID: id,
-		Active:    true,
-		Expiry:    &expires,
-		CreatedAt: &now,
-		UpdatedAt: &now,
+		ID:         primitive.NewObjectID(),
+		SessionID:  cookie.Value,
+		AccountID:  userId,
+		CookieType: COOKIE_SESSION,
+		Cookie:     cookie,
+		CreatedAt:  &ts,
+		UpdatedAt:  &ts,
 	}
+
+	// now := time.Now().UTC()
+	// expires := time.Now().Add(time.Duration(SECONDS_IN_DAY) * time.Second).UTC() // 24 hours from now
+	// id := uuid.New().String()
+	// return &Session{
+	// 	ID:        primitive.NewObjectID(),
+	// 	AccountID: userId,
+	// 	SessionID: id,
+	// 	Active:    true,
+	// 	Expiry:    &expires,
+	// 	CreatedAt: &now,
+	// 	UpdatedAt: &now,
+	// }
 }
 
 // is the session expired?
 func (s *Session) IsExpired() bool {
-	return s.Expiry.Before(time.Now().UTC())
+	return s.Cookie.Expires.Before(time.Now().UTC())
 }
 
 // format a session for the client (set into cookie from sveltekit)
 func (s *Session) FormatForClient() bson.M {
 	return bson.M{
 		"session_id": s.SessionID,
-		"expiry":     s.Expiry,
+		"expiry":     s.Cookie.Expires,
 	}
 }
 
 // for unmarshalling a session from the request into the session object to be passes down the chain
-func UnmarshalIntoSession(rc *RequestCtx) {
+func UnmarshalSession(rc *RequestCtx) {
 	var err error
 
 	body, err := io.ReadAll(rc.Request.Body)
@@ -121,3 +136,11 @@ func UnmarshalIntoSession(rc *RequestCtx) {
 func ResolveSessionFromCtx(rc *RequestCtx) *Session {
 	return NewSession(rc.AccountCtx.Account.ID)
 }
+
+// Bitfield flags for sessions
+type SessionFlag uint
+
+const (
+	SessionFlagNone              SessionFlag = iota      // ssession has no flags
+	SessionFlagMarkedForDeletion SessionFlag = 1 << iota // session is marked for deletion
+)
