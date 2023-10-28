@@ -12,12 +12,19 @@ func QrStrAddCreatorOnThread() bson.D {
 func QrStrLookupPosts(sortBy string, sortDir int, limit int) bson.D {
 	pipe := bson.A{
 		BsonOperator("$sort", sortBy, sortDir),
-		BsonD("$limit", limit),
+	}
+
+	if limit > 0 {
+		pipe = append(pipe, BsonD("$limit", limit))
+	}
+
+	pipe = append(
+		pipe,
 		// lookup media here
 		QrStrLookupIdentity("creator"),
 		BsonOperator("$addFields", "creator", BsonOperWithArray("$arrayElemAt", []interface{}{"$creator", 0})),
 		BsonOperWithArray("$unset", []interface{}{"thread", "board", "account"}),
-	}
+	)
 
 	return BsonLookup("posts", "posts", "_id", "posts", bson.D{}, pipe)
 }

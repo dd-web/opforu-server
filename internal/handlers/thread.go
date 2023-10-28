@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"net/http"
-
 	"github.com/dd-web/opforu-server/internal/builder"
 	"github.com/dd-web/opforu-server/internal/types"
 	"github.com/gorilla/mux"
@@ -22,6 +20,8 @@ func InitThreadHandler(rh *types.RoutingHandler) *ThreadHandler {
 /* ROOT path: host.com/api/thread/{slug}
 /***********************************************************************************************/
 func (th *ThreadHandler) RegisterThreadRoot(rc *types.RequestCtx) error {
+	rc.UpdateStore(th.rh.Store)
+
 	switch rc.Request.Method {
 	case "GET":
 		return th.handleThreadRoot(rc)
@@ -35,10 +35,16 @@ func (th *ThreadHandler) handleThreadRoot(rc *types.RequestCtx) error {
 	vars := mux.Vars(rc.Request)
 	pipeline := builder.QrStrEntireThread(vars["slug"], rc.Query)
 
-	thread, err := th.rh.Store.RunAggregation("threads", pipeline)
+	// fmt.Println("pipeline", pipeline)
+
+	result, err := th.rh.Store.RunAggregation("threads", pipeline)
 	if err != nil {
 		return err
 	}
 
-	return HandleSendJSON(rc.Writer, http.StatusOK, thread)
+	// aggregation results always come back as an array, even if there is only one result
+	rc.AddToResponseList("thread", result[0])
+	return ResolveResponse(rc)
+
+	// return HandleSendJSON(rc.Writer, http.StatusOK, thread)
 }

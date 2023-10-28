@@ -25,6 +25,8 @@ func InitAccountHandlers(rh *types.RoutingHandler) *AccountHandler {
 /* ROOT path: host.com/api/account
 /***********************************************************************************************/
 func (ah *AccountHandler) RegisterAccountRoot(rc *types.RequestCtx) error {
+	rc.UpdateStore(ah.rh.Store)
+
 	switch rc.Request.Method {
 	case "GET":
 		return ah.handleGetAccount(rc)
@@ -42,6 +44,8 @@ func (ah *AccountHandler) handleGetAccount(rc *types.RequestCtx) error {
 /* ROOT path: host.com/api/account/login
 /***********************************************************************************************/
 func (ah *AccountHandler) RegisterAccountLogin(rc *types.RequestCtx) error {
+	rc.UpdateStore(ah.rh.Store)
+
 	switch rc.Request.Method {
 	case "POST":
 		return ah.handlePostAccountLogin(rc)
@@ -102,6 +106,8 @@ func (ah *AccountHandler) handlePostAccountLogin(rc *types.RequestCtx) error {
 /* ROOT path: host.com/api/account/register
 /***********************************************************************************************/
 func (ah *AccountHandler) RegisterAccountRegister(rc *types.RequestCtx) error {
+	rc.UpdateStore(ah.rh.Store)
+
 	switch rc.Request.Method {
 	case "POST":
 		return ah.handlePostAccountRegister(rc)
@@ -171,6 +177,8 @@ func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error 
 /* ROOT path: host.com/api/account/me
 /***********************************************************************************************/
 func (ah *AccountHandler) RegisterAccountMe(rc *types.RequestCtx) error {
+	rc.UpdateStore(ah.rh.Store)
+
 	switch rc.Request.Method {
 	case "POST":
 		return ah.handlePostAccountMe(rc)
