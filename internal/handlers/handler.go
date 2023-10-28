@@ -10,10 +10,8 @@ import (
 
 type HandlerWrapperFunc func(rc *types.RequestCtx) error
 
-// All handlers are wrapped in this function to catch errors that may propagate.
-// it's responsible for catching the error and sending it to the client if it's
-// an error we can handle, otherwise it will send a generic error message.
-// otherwise the response should be sent by the handler itself.
+// wraps a handle func with a request context and error handling
+// populates request context with request details such as the account making the request (if any)
 func WrapFn(f HandlerWrapperFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// create request context here and pass in f()
@@ -21,7 +19,7 @@ func WrapFn(f HandlerWrapperFunc) http.HandlerFunc {
 		types.RequestLogger(rc)
 
 		// finally got the cookies working
-		fmt.Printf("Cookies: %v\n", rc.Request.Cookies())
+		// fmt.Printf("Cookies: %v\n", rc.Request.Cookies())
 
 		if err := f(rc); err != nil {
 			fmt.Println("Error in handler:", err)
@@ -47,4 +45,10 @@ func HandleSendJSON(w http.ResponseWriter, status int, v any) error {
 // fallthrough handler for unsupported methods
 func HandleUnsupportedMethod(w http.ResponseWriter, r *http.Request) error {
 	return HandleSendJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "unsupported method"})
+}
+
+// finalizes the response and sends it to the client
+func ResolveResponse(rc *types.RequestCtx) error {
+	rc.Finalize()
+	return HandleSendJSON(rc.Writer, http.StatusOK, rc.ResponseData)
 }

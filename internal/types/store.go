@@ -18,7 +18,14 @@ type Store struct {
 	DB     *mongo.Database
 	Name   string
 
+	// keeps track of boards short name to it's object id
 	BoardIDs map[string]primitive.ObjectID
+
+	// account cache keeps track of users currently using the site to avoid constant db lookups.
+	// the lifetime of an entry should not exceed the lifetime of a session and should be deleted
+	// when the session is destroyed or expires.
+	// key is the session id and value is the account that matches that session
+	AccountCache map[string]*Account
 
 	StartedAt *time.Time
 	EndedAt   *time.Time
@@ -175,6 +182,23 @@ func (s *Store) CountThreadMatch(boardId primitive.ObjectID, filter bson.D) (int
 	return count, nil
 }
 
+// Finds the total number of articles matching the given filter
+func (s *Store) CountArticleMatch(filter bson.D) (int64, error) {
+	countOpts := options.Count().SetMaxTime(5 * time.Second)
+	collection := s.DB.Collection("articles")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	count, err := collection.CountDocuments(ctx, filter, countOpts)
+	if err != nil {
+		fmt.Println("Error getting total record count", err)
+		return 0, err
+	}
+
+	return count, nil
+}
+
 // find a session by it's session_id
 func (s *Store) FindSession(session string) (*Session, error) {
 	if session == "" {
@@ -232,17 +256,50 @@ func (s *Store) FindAccountByUsernameOrEmail(username string, email string) (*Ac
 	return &result, nil
 }
 
-// find an active session by it's account id
-func (s *Store) FindSessionFromUser(act primitive.ObjectID) (*Session, error) {
+// find an account by it's session id
+// will return from cache if available, else query for the account and cache it before returning
+func (s *Store) FindAccountFromSession(session string) (*Account, error) {
+	fmt.Println("Finding account from session")
+	if session == "" {
+		return nil, fmt.Errorf("session id is empty")
+	}
+
+	cached, ok := s.AccountCache[session]
+	if ok {
+		return cached, nil
+	}
+
 	collection := s.DB.Collection("sessions")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	var result Session
-	err := collection.FindOne(ctx, bson.D{{Key: "account", Value: act}, {Key: "active", Value: true}}).Decode(&result)
+	err := collection.FindOne(ctx, bson.D{{Key: "session_id", Value: session}}).Decode(&result)
 	if err != nil {
 		return nil, err
 	}
 
-	return &result, nil
+	account, err := s.FindAccountByID(result.AccountID)
+	if err != nil {
+		return nil, err
+	}
+
+	s.AccountCache[session] = account
+
+	return account, nil
 }
+
+// find an active session by it's account id
+// func (s *Store) FindSessionFromUser(act primitive.ObjectID) (*Session, error) {
+// 	collection := s.DB.Collection("sessions")
+// 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// 	defer cancel()
+
+// 	var result Session
+// 	err := collection.FindOne(ctx, bson.D{{Key: "account", Value: act}, {Key: "active", Value: true}}).Decode(&result)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return &result, nil
+// }

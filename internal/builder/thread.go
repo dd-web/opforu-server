@@ -30,9 +30,9 @@ func QrStrLookupThreads(boardID primitive.ObjectID, cfg *types.QueryCtx) (bson.A
 		BsonD("$limit", cfg.Limit),
 		BsonOperator("$addFields", "post_count", BsonD("$size", "$posts")),
 		QrStrLookupPosts("post_number", 1, 5),
-		QrStrLookupIdentityCreator(),
+		QrStrLookupIdentity("creator"),
 		BsonOperator("$addFields", "creator", BsonOperWithArray("$arrayElemAt", []interface{}{"$creator", 0})),
-		QrStrLookupIdentityMods(),
+		QrStrLookupIdentity("mods"),
 		BsonOperWithArray("$unset", []interface{}{"board", "account"}),
 		// lookup media here
 	}, nil
@@ -43,9 +43,9 @@ func QrStrEntireThread(slug string, cfg *types.QueryCtx) bson.A {
 	return bson.A{
 		BsonOperator("$match", "slug", slug),
 		QrStrLookupPosts("post_number", -1, 0),
-		QrStrLookupIdentityCreator(),
+		QrStrLookupIdentity("creator"),
 		BsonOperator("$addFields", "creator", BsonOperWithArray("$arrayElemAt", []interface{}{"$creator", 0})),
-		QrStrLookupIdentityMods(),
+		QrStrLookupIdentity("mods"),
 		BsonOperWithArray("$unset", []interface{}{"board", "account"}),
 		// lookup media here
 	}

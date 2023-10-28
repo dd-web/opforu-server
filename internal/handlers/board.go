@@ -111,6 +111,7 @@ func (bh *BoardHandler) handleBoardShort(rc *types.RequestCtx) error {
 	}
 
 	rc.Records = threads
-
-	return HandleSendJSON(rc.Writer, http.StatusOK, bson.M{"board": board, "threads": rc.Records, "paginator": rc.Pagination})
+	rc.AddToResponseList("board", board)
+	return ResolveResponse(rc)
+	// return HandleSendJSON(rc.Writer, http.StatusOK, bson.M{"board": board, "threads": rc.Records, "paginator": rc.Pagination})
 }

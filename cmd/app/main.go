@@ -31,32 +31,36 @@ func main() {
 		log.Fatal(err)
 	}
 
-	router := types.NewRoutingHandler(store)
+	handler := types.NewRoutingHandler(store)
 
-	handler_account := handlers.InitAccountHandlers(router)
-	handler_board := handlers.InitBoardHandler(router)
-	handler_thread := handlers.InitThreadHandler(router)
+	handler_account := handlers.InitAccountHandlers(handler)
+	handler_article := handlers.InitArticleHandler(handler)
+	handler_board := handlers.InitBoardHandler(handler)
+	handler_thread := handlers.InitThreadHandler(handler)
 
 	fmt.Println("Registering handlers...")
 
 	// account
-	router.Router.HandleFunc("/api/account/login", handlers.WrapFn(handler_account.RegisterAccountLogin))
-	router.Router.HandleFunc("/api/account/register", handlers.WrapFn(handler_account.RegisterAccountRegister))
-	router.Router.HandleFunc("/api/account/me", handlers.WrapFn(handler_account.RegisterAccountMe))
-	router.Router.HandleFunc("/api/account", handlers.WrapFn(handler_account.RegisterAccountRoot))
+	handler.Router.HandleFunc("/api/account/login", handlers.WrapFn(handler_account.RegisterAccountLogin))
+	handler.Router.HandleFunc("/api/account/register", handlers.WrapFn(handler_account.RegisterAccountRegister))
+	handler.Router.HandleFunc("/api/account/me", handlers.WrapFn(handler_account.RegisterAccountMe))
+	handler.Router.HandleFunc("/api/account", handlers.WrapFn(handler_account.RegisterAccountRoot))
+
+	// articles
+	handler.Router.HandleFunc("/api/articles", handlers.WrapFn(handler_article.RegisterArticleRoot))
 
 	// boards
-	router.Router.HandleFunc("/api/boards/{short}", handlers.WrapFn(handler_board.RegisterBoardShort))
-	router.Router.HandleFunc("/api/boards", handlers.WrapFn(handler_board.RegisterBoardRoot))
+	handler.Router.HandleFunc("/api/boards/{short}", handlers.WrapFn(handler_board.RegisterBoardShort))
+	handler.Router.HandleFunc("/api/boards", handlers.WrapFn(handler_board.RegisterBoardRoot))
 
 	// threads
-	router.Router.HandleFunc("/api/threads/{slug}", handlers.WrapFn(handler_thread.RegisterThreadRoot))
+	handler.Router.HandleFunc("/api/threads/{slug}", handlers.WrapFn(handler_thread.RegisterThreadRoot))
 
 	// request config
-	router.Router.Use(mux.CORSMethodMiddleware(router.Router))
+	handler.Router.Use(mux.CORSMethodMiddleware(handler.Router))
 
 	srv := &http.Server{
-		Handler:      router.Router,
+		Handler:      handler.Router,
 		Addr:         "127.0.0.1:3001",
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,

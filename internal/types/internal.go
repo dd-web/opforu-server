@@ -29,27 +29,32 @@ const (
 
 // holds all of the resolved/parsed request details and info so that handlers can be more simple and focused.
 type RequestCtx struct {
-	Request    *http.Request       // request
-	Writer     http.ResponseWriter // writer
-	Query      *QueryCtx           // the parsed query context (or nil if irrelevant/not yet parsed)
-	Resource   APIResource         // this is the main subroute of the API, the first major path after root.
-	Pagination *PageCtx            `json:"pages"`   // pagination information
-	Records    []bson.M            `json:"records"` // resource(s) we intend to return to the client
-	Store      *Store
-	AccountCtx *AccountCtx
+	Request      *http.Request       // request
+	Writer       http.ResponseWriter // writer
+	Query        *QueryCtx           // the parsed query context (or nil if irrelevant/not yet parsed)
+	Resource     APIResource         // this is the main subroute of the API, the first major path after root.
+	Pagination   *PageCtx            `json:"pages"`   // pagination information
+	Records      []bson.M            `json:"records"` // resource(s) we intend to return to the client
+	Store        *Store
+	AccountCtx   *AccountCtx
+	ResponseList []bson.M
+	ResponseData bson.M
+	// ResponseFormatted bson.D
 }
 
 // creates a new request context - parses and resolves request details into the context
 // in order for handlers to be more simple and focused
 func NewRequestCtx(w http.ResponseWriter, r *http.Request) *RequestCtx {
 	return (&RequestCtx{
-		Request:    r,
-		Writer:     w,
-		Query:      NewQueryCtx(),
-		Resource:   APIResource(strings.Split(r.URL.Path, "/")[2]),
-		Pagination: NewPageCtx(),
-		Records:    []bson.M{},
-		AccountCtx: NewAccountCtx(),
+		Request:      r,
+		Writer:       w,
+		Query:        NewQueryCtx(),
+		Resource:     APIResource(strings.Split(r.URL.Path, "/")[2]),
+		Pagination:   NewPageCtx(),
+		Records:      []bson.M{},
+		ResponseList: []bson.M{},
+		ResponseData: bson.M{},
+		AccountCtx:   NewAccountCtx(),
 	}).Resolve()
 }
 
@@ -58,8 +63,27 @@ func (rc *RequestCtx) UpdateStore(s *Store) {
 	rc.Store = s
 }
 
+// adds the given key/value pair to the response list to be returned to the
+// client when the response is finalized
+func (rc *RequestCtx) AddToResponseList(k string, v any) {
+	rc.ResponseList = append(rc.ResponseList, bson.M{k: v})
+}
+
+// prepares the response list to be sent to the client
+func (rc *RequestCtx) Finalize() {
+	rc.AddToResponseList("paginator", rc.Pagination)
+	rc.AddToResponseList("records", rc.Records)
+
+	for _, v := range rc.ResponseList {
+		for key, value := range v {
+			rc.ResponseData[key] = value
+		}
+	}
+}
+
 // parse the request and populate each of the contexts with relevant information
-// certain contexts must be done synchronously in a certain order to ensure the necessary data is available
+// certain contexts must be done synchronously in a certain order to ensure the
+// necessary data is available for the next context to be resolved
 func (rc *RequestCtx) Resolve() *RequestCtx {
 	var current_page int = 1
 	var page_size int = 10
@@ -200,7 +224,7 @@ func NewAccountCtx() *AccountCtx {
 
 // logs the request to the console
 func RequestLogger(rc *RequestCtx) {
-	fmt.Printf("[%s]: WHAT: %s - WHO: %s - %s\n", rc.Request.Method, rc.Request.URL.Path, rc.Request.RemoteAddr, rc.Request.UserAgent())
+	fmt.Printf("[%s]: %s - %s \n", rc.Request.Method, rc.Request.URL.Path, rc.Request.RemoteAddr)
 }
 
 // top level router with access to the store for database operations

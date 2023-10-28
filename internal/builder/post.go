@@ -14,7 +14,7 @@ func QrStrLookupPosts(sortBy string, sortDir int, limit int) bson.D {
 		BsonOperator("$sort", sortBy, sortDir),
 		BsonD("$limit", limit),
 		// lookup media here
-		QrStrLookupIdentityCreator(),
+		QrStrLookupIdentity("creator"),
 		BsonOperator("$addFields", "creator", BsonOperWithArray("$arrayElemAt", []interface{}{"$creator", 0})),
 		BsonOperWithArray("$unset", []interface{}{"thread", "board", "account"}),
 	}
