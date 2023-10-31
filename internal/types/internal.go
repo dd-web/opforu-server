@@ -39,6 +39,8 @@ type RequestCtx struct {
 	AccountCtx   *AccountCtx
 	ResponseList []bson.M
 	ResponseData bson.M
+	DeleteCookie bool
+	SetCookie    bool
 	// ResponseFormatted bson.D
 }
 
@@ -55,12 +57,15 @@ func NewRequestCtx(w http.ResponseWriter, r *http.Request) *RequestCtx {
 		ResponseList: []bson.M{},
 		ResponseData: bson.M{},
 		AccountCtx:   NewAccountCtx(),
+		DeleteCookie: false,
+		SetCookie:    false,
 	}).Resolve()
 }
 
 // updates the request context with the store
 func (rc *RequestCtx) UpdateStore(s *Store) {
 	rc.Store = s
+	rc.ResolveAccountCtx() // we call this here for access to the store
 }
 
 // adds the given key/value pair to the response list to be returned to the
@@ -74,9 +79,35 @@ func (rc *RequestCtx) Finalize() {
 	rc.AddToResponseList("paginator", rc.Pagination)
 	rc.AddToResponseList("records", rc.Records)
 
+	if rc.AccountCtx.Account != nil {
+		rc.AddToResponseList("account", rc.AccountCtx.Account)
+	}
+
 	for _, v := range rc.ResponseList {
 		for key, value := range v {
 			rc.ResponseData[key] = value
+		}
+	}
+}
+
+// resolves an account context for the request
+func (rc *RequestCtx) ResolveAccountCtx() {
+	var sessionid string = ""
+
+	for _, v := range rc.Request.Cookies() {
+		if v.Name == "session" {
+			sessionid = v.Value
+		}
+	}
+
+	fmt.Println("Resolved Session ID:", sessionid)
+	if sessionid != "" {
+		session, err := rc.Store.FindSession(sessionid)
+		if err != nil {
+			fmt.Println("Error finding session", err)
+			rc.DeleteCookie = true
+		} else {
+			fmt.Println("Found Session:", session)
 		}
 	}
 }

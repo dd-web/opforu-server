@@ -35,16 +35,11 @@ func (th *ThreadHandler) handleThreadRoot(rc *types.RequestCtx) error {
 	vars := mux.Vars(rc.Request)
 	pipeline := builder.QrStrEntireThread(vars["slug"], rc.Query)
 
-	// fmt.Println("pipeline", pipeline)
-
 	result, err := th.rh.Store.RunAggregation("threads", pipeline)
 	if err != nil {
 		return err
 	}
 
-	// aggregation results always come back as an array, even if there is only one result
 	rc.AddToResponseList("thread", result[0])
 	return ResolveResponse(rc)
-
-	// return HandleSendJSON(rc.Writer, http.StatusOK, thread)
 }

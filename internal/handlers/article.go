@@ -49,7 +49,5 @@ func (ah *ArticleHandler) handleArticleList(rc *types.RequestCtx) error {
 	}
 
 	rc.Records = articles
-	// return HandleSendJSON(rc.Writer, http.StatusOK, bson.M{"articles": articles, "paginator": rc.Pagination})
-	// rc.AddToResponseList("articles", articles)
 	return ResolveResponse(rc)
 }

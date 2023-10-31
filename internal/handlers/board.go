@@ -45,7 +45,7 @@ func (bh *BoardHandler) handleBoardList(rc *types.RequestCtx) error {
 	cursor, err := col.Find(ctx, bson.M{})
 	if err != nil {
 		fmt.Println("Error decoding board", err)
-		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"})
+		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
 	}
 
 	defer func() {
@@ -59,12 +59,12 @@ func (bh *BoardHandler) handleBoardList(rc *types.RequestCtx) error {
 		err := cursor.Decode(&board)
 		if err != nil {
 			fmt.Println("Error decoding board", err)
-			return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"})
+			return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
 		}
 		boards = append(boards, board)
 	}
 
-	return HandleSendJSON(rc.Writer, http.StatusOK, boards)
+	return HandleSendJSON(rc.Writer, http.StatusOK, boards, rc)
 }
 
 /***********************************************************************************************/

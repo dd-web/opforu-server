@@ -1,12 +1,10 @@
 package types
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -41,106 +39,110 @@ type Session struct {
 	SessionID string             `bson:"session_id" json:"session_id"`
 	AccountID primitive.ObjectID `bson:"account_id" json:"account_id"`
 
-	CookieType CookieVariant `bson:"cookie_type" json:"cookie_type"`
+	MaxAge   int           `bson:"max_age" json:"max_age"`
+	HttpOnly bool          `bson:"http_only" json:"http_only"`
+	Secure   bool          `bson:"secure" json:"secure"`
+	Path     string        `bson:"path" json:"path"`
+	SameSite http.SameSite `bson:"same_site" json:"same_site"`
+	Domain   string        `bson:"domain" json:"domain"`
 
-	Flags []SessionFlag `bson:"flags" json:"flags"`
-
-	Cookie *http.Cookie `bson:"-" json:"-"`
+	Expires *time.Time `bson:"expires" json:"expires"`
 
 	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
 	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
 	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
-func NewSession(userId primitive.ObjectID) *Session {
-	cookie := NewSessionCookie()
+// creates a new session for the given account
+func NewSession(account primitive.ObjectID) *Session {
+	id := uuid.NewString()
 	ts := time.Now().UTC()
-	return &Session{
-		ID:         primitive.NewObjectID(),
-		SessionID:  cookie.Value,
-		AccountID:  userId,
-		CookieType: COOKIE_SESSION,
-		Cookie:     cookie,
-		CreatedAt:  &ts,
-		UpdatedAt:  &ts,
-	}
+	exp := time.Now().Add(time.Duration(SECONDS_IN_DAY) * time.Second).UTC()
 
-	// now := time.Now().UTC()
-	// expires := time.Now().Add(time.Duration(SECONDS_IN_DAY) * time.Second).UTC() // 24 hours from now
-	// id := uuid.New().String()
-	// return &Session{
-	// 	ID:        primitive.NewObjectID(),
-	// 	AccountID: userId,
-	// 	SessionID: id,
-	// 	Active:    true,
-	// 	Expiry:    &expires,
-	// 	CreatedAt: &now,
-	// 	UpdatedAt: &now,
-	// }
+	return &Session{
+		ID:        primitive.NewObjectID(),
+		SessionID: id,
+		AccountID: account,
+		MaxAge:    SECONDS_IN_DAY,
+		HttpOnly:  true,
+		Secure:    true,
+		Path:      "/",
+		SameSite:  http.SameSiteStrictMode,
+		Expires:   &exp,
+		CreatedAt: &ts,
+		UpdatedAt: &ts,
+	}
+}
+
+// formats session into an http cookie
+func (s *Session) CookieFromSession() *http.Cookie {
+	return &http.Cookie{
+		Name:     "session_id",
+		Value:    s.SessionID,
+		Expires:  *s.Expires,
+		MaxAge:   s.MaxAge,
+		HttpOnly: s.HttpOnly,
+		Secure:   s.Secure,
+		Path:     s.Path,
+		SameSite: s.SameSite,
+		Domain:   s.Domain,
+	}
 }
 
 // is the session expired?
 func (s *Session) IsExpired() bool {
-	return s.Cookie.Expires.Before(time.Now().UTC())
+	return s.Expires.Before(time.Now().UTC())
 }
 
 // format a session for the client (set into cookie from sveltekit)
 func (s *Session) FormatForClient() bson.M {
 	return bson.M{
 		"session_id": s.SessionID,
-		"expiry":     s.Cookie.Expires,
+		"expiry":     s.Expires,
 	}
 }
 
 // for unmarshalling a session from the request into the session object to be passes down the chain
-func UnmarshalSession(rc *RequestCtx) {
-	var err error
+// func UnmarshalSession(rc *RequestCtx) {
+// 	var err error
 
-	body, err := io.ReadAll(rc.Request.Body)
-	if err != nil {
-		fmt.Println("error reading body")
-		return
-	}
+// 	body, err := io.ReadAll(rc.Request.Body)
+// 	if err != nil {
+// 		fmt.Println("error reading body")
+// 		return
+// 	}
 
-	var parsed struct {
-		Session string `json:"session"`
-	}
+// 	var parsed struct {
+// 		Session string `json:"session"`
+// 	}
 
-	err = json.Unmarshal(body, &parsed)
-	if err != nil {
-		fmt.Println("error unmarshalling body")
-		return
-	}
+// 	err = json.Unmarshal(body, &parsed)
+// 	if err != nil {
+// 		fmt.Println("error unmarshalling body")
+// 		return
+// 	}
 
-	foundSession, err := rc.Store.FindSession(parsed.Session)
-	if err != nil {
-		return
-	}
+// 	foundSession, err := rc.Store.FindSession(parsed.Session)
+// 	if err != nil {
+// 		return
+// 	}
 
-	if foundSession.IsExpired() {
-		fmt.Println("session expired")
-		return
-	}
+// 	if foundSession.IsExpired() {
+// 		fmt.Println("session expired")
+// 		return
+// 	}
 
-	account, err := rc.Store.FindAccountByID(foundSession.AccountID)
-	if err != nil {
-		fmt.Println("could not find the user account")
-		return
-	}
+// 	account, err := rc.Store.FindAccountByID(foundSession.AccountID)
+// 	if err != nil {
+// 		fmt.Println("could not find the user account")
+// 		return
+// 	}
 
-	rc.AccountCtx.Account = account
-	rc.AccountCtx.Session = foundSession
+// 	rc.AccountCtx.Account = account
+// 	rc.AccountCtx.Session = foundSession
 
-}
+// }
 
-func ResolveSessionFromCtx(rc *RequestCtx) *Session {
-	return NewSession(rc.AccountCtx.Account.ID)
-}
-
-// Bitfield flags for sessions
-type SessionFlag uint
-
-const (
-	SessionFlagNone              SessionFlag = iota      // ssession has no flags
-	SessionFlagMarkedForDeletion SessionFlag = 1 << iota // session is marked for deletion
-)
+// func ResolveSessionFromCtx(rc *RequestCtx) *Session {
+// 	return NewSession(rc.AccountCtx.Account.ID)
+// }

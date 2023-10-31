@@ -23,7 +23,7 @@ func WrapFn(f HandlerWrapperFunc) http.HandlerFunc {
 
 		if err := f(rc); err != nil {
 			fmt.Println("Error in handler:", err)
-			HandleSendJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			HandleSendJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()}, rc)
 		}
 	}
 }
@@ -31,10 +31,31 @@ func WrapFn(f HandlerWrapperFunc) http.HandlerFunc {
 // Handles the sending of JSON responses to the client.
 // it's responsible for setting the response headers and status code as well as any data
 // that needs to be sent. data should be serialized before being passed to this function.
-func HandleSendJSON(w http.ResponseWriter, status int, v any) error {
+func HandleSendJSON(w http.ResponseWriter, status int, v any, rc *types.RequestCtx) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(status)
+
+	if rc != nil {
+		if rc.DeleteCookie {
+			fmt.Println("Should Delete Cookie")
+			c := types.NewCookieDeleter()
+			http.SetCookie(w, c)
+		}
+		if rc.SetCookie {
+			fmt.Println("Should Set Cookie")
+			var c *http.Cookie
+			if rc.AccountCtx.Session != nil {
+				c = rc.AccountCtx.Session.CookieFromSession()
+			}
+			if c != nil {
+				http.SetCookie(w, c)
+			}
+			fmt.Println("Cookie to set:", c)
+		}
+	}
+
+	fmt.Println("Response Code:", status)
 
 	if v != nil {
 		return json.NewEncoder(w).Encode(v)
@@ -44,11 +65,11 @@ func HandleSendJSON(w http.ResponseWriter, status int, v any) error {
 
 // fallthrough handler for unsupported methods
 func HandleUnsupportedMethod(w http.ResponseWriter, r *http.Request) error {
-	return HandleSendJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "unsupported method"})
+	return HandleSendJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "unsupported method"}, nil)
 }
 
 // finalizes the response and sends it to the client
 func ResolveResponse(rc *types.RequestCtx) error {
 	rc.Finalize()
-	return HandleSendJSON(rc.Writer, http.StatusOK, rc.ResponseData)
+	return HandleSendJSON(rc.Writer, http.StatusOK, rc.ResponseData, rc)
 }
