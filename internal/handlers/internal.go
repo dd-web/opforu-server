@@ -28,9 +28,15 @@ func InitInternalHandlers(rh *types.RoutingHandler) *InternalHandler {
 // retreives a session from it's id
 func (ih *InternalHandler) HandleGetSession(rc *types.RequestCtx) error {
 	rc.UpdateStore(ih.rh.Store)
-	vars := mux.Vars(rc.Request)
+	sessionid := mux.Vars(rc.Request)["session_id"]
 
-	fmt.Println("looking for session", vars["session_id"])
+	fmt.Println("looking for session", sessionid)
 
-	return nil
+	session, err := rc.Store.FindSession(sessionid)
+	if err != nil {
+		return err
+	}
+
+	rc.AddToResponseList("session", session)
+	return ResolveResponse(rc)
 }

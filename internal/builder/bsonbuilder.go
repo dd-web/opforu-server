@@ -17,7 +17,11 @@
 package builder
 
 import (
+	"fmt"
+
+	"github.com/dd-web/opforu-server/internal/types"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // Create a bson.A - takes an array of any type, each will be inserted into the bson.A as itself
@@ -107,4 +111,27 @@ func BsonOperator(op string, k string, v any) bson.D {
 // same as BsonOperator but for operators that take an array instead of k/v pair
 func BsonOperWithArray(op string, v []any) bson.D {
 	return BsonD(op, BsonA(v))
+}
+
+// starts a paginated pipeline with a match on the given key/value pair
+func StartPaginatedPipe(mkey string, mval primitive.ObjectID, cfg *types.QueryCtx) (bson.A, error) {
+	if mval == primitive.NilObjectID {
+		return nil, fmt.Errorf("invalid match key: %s", mkey)
+	}
+
+	match := BsonD("$match", BsonD(mkey, mval))
+	match = append(match, cfg.Search...)
+
+	sort := cfg.Sort
+	if sort == "" {
+		sort = "updated_at"
+	}
+
+	return bson.A{
+		match,
+		BsonOperator("$sort", sort, cfg.Order),
+		BsonD("$skip", cfg.Skip),
+		BsonD("$limit", cfg.Limit),
+	}, nil
+
 }

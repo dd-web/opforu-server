@@ -35,7 +35,8 @@ func (ah *AccountHandler) RegisterAccountRoot(rc *types.RequestCtx) error {
 	}
 }
 
-// GET: host.com/api/account
+// METHOD: GET
+// PATH: host.com/api/account
 func (ah *AccountHandler) handleGetAccount(rc *types.RequestCtx) error {
 	return HandleSendJSON(rc.Writer, http.StatusOK, bson.M{"message": "account handler"}, rc)
 }
@@ -54,7 +55,8 @@ func (ah *AccountHandler) RegisterAccountLogin(rc *types.RequestCtx) error {
 	}
 }
 
-// POST: host.com/api/account/login
+// METHOD: POST
+// PATH: host.com/api/account/login
 func (ah *AccountHandler) handlePostAccountLogin(rc *types.RequestCtx) error {
 	body, err := io.ReadAll(rc.Request.Body)
 	if err != nil {
@@ -114,7 +116,8 @@ func (ah *AccountHandler) RegisterAccountRegister(rc *types.RequestCtx) error {
 	}
 }
 
-// POST: host.com/api/account/register
+// METHOD: POST
+// PATH: host.com/api/account/register
 func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error {
 	body, err := io.ReadAll(rc.Request.Body)
 	if err != nil {

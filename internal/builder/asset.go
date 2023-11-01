@@ -22,10 +22,7 @@ func QrStrLookupAssets() bson.D {
 		BsonLookup("asset_sources", "source_id", "_id", "source", bson.D{}, bson.A{}),
 		BsonOperator("$addFields", "source", BsonOperWithArray("$arrayElemAt", []interface{}{"$source", 0})),
 		BsonProjectionMap(ASSET_PUBLIC_PROJECTION),
+		BsonOperWithArray("$unset", []interface{}{"_id"}),
 	}
 	return BsonLookup("assets", "assets", "_id", "assets", bson.D{}, pipe)
 }
-
-// func QrStrLookupAssetSource() bson.D {
-// 	projection := bson.A{BsonProjection()}
-// }
