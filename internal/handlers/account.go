@@ -86,7 +86,7 @@ func (ah *AccountHandler) handlePostAccountLogin(rc *types.RequestCtx) error {
 		return HandleSendJSON(rc.Writer, http.StatusUnauthorized, bson.M{"error": "invalid login credentials"}, rc)
 	}
 
-	session := types.NewSession(account.ID)
+	session := types.NewSession(account)
 
 	err = rc.Store.SaveNewSingle(session, "sessions")
 	if err != nil {
@@ -97,17 +97,7 @@ func (ah *AccountHandler) handlePostAccountLogin(rc *types.RequestCtx) error {
 	rc.AccountCtx.Account = account
 	rc.AccountCtx.Session = session
 
-	rc.SetCookie = true
-	rc.DeleteCookie = false // just in case
-
 	return ResolveResponse(rc)
-
-	// resp := bson.M{
-	// 	"account": account.FormatForClient(),
-	// 	"session": session.FormatForClient(),
-	// }
-
-	// return HandleSendJSON(rc.Writer, http.StatusOK, resp, rc)
 }
 
 /***********************************************************************************************/
@@ -159,7 +149,7 @@ func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error 
 	newAccount.Username = parsed.Username
 	newAccount.Email = parsed.Email
 
-	session := types.NewSession(newAccount.ID)
+	session := types.NewSession(newAccount)
 
 	err = rc.Store.SaveNewSingle(newAccount, "accounts")
 	if err != nil {
@@ -173,65 +163,8 @@ func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error 
 		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
 	}
 
-	resp := bson.M{
-		"account": newAccount.FormatForClient(),
-		"session": session.FormatForClient(),
-	}
+	rc.AccountCtx.Account = account
+	rc.AccountCtx.Session = session
 
-	return HandleSendJSON(rc.Writer, http.StatusOK, resp, rc)
-}
-
-/***********************************************************************************************/
-/* ROOT path: host.com/api/account/me
-/***********************************************************************************************/
-func (ah *AccountHandler) RegisterAccountMe(rc *types.RequestCtx) error {
-	rc.UpdateStore(ah.rh.Store)
-
-	switch rc.Request.Method {
-	case "POST":
-		return ah.handlePostAccountMe(rc)
-	default:
-		return HandleUnsupportedMethod(rc.Writer, rc.Request)
-	}
-}
-
-// POST: host.com/api/account/me
-func (ah *AccountHandler) handlePostAccountMe(rc *types.RequestCtx) error {
-	body, err := io.ReadAll(rc.Request.Body)
-	if err != nil {
-		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"}, rc)
-	}
-
-	var parsed struct {
-		Session string `json:"session_id"`
-	}
-
-	err = json.Unmarshal(body, &parsed)
-	if err != nil {
-		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"}, rc)
-	}
-
-	session, err := rc.Store.FindSession(parsed.Session)
-	if err != nil {
-		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid session"}, rc)
-	}
-
-	if session.IsExpired() {
-		fmt.Println("Session expired")
-		return HandleSendJSON(rc.Writer, http.StatusUnauthorized, bson.M{"error": "session expired"}, rc)
-	}
-
-	account, err := rc.Store.FindAccountByID(session.AccountID)
-	if err != nil {
-		fmt.Println("Error finding account", err)
-		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid session"}, rc)
-	}
-
-	resp := bson.M{
-		"account": account.FormatForClient(),
-		"session": session.FormatForClient(),
-	}
-
-	return HandleSendJSON(rc.Writer, http.StatusOK, resp, rc)
-
+	return ResolveResponse(rc)
 }

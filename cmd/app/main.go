@@ -26,7 +26,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = store.HydrateBoardIDs()
+	err = store.HydrateCache()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -37,13 +37,14 @@ func main() {
 	handler_article := handlers.InitArticleHandler(handler)
 	handler_board := handlers.InitBoardHandler(handler)
 	handler_thread := handlers.InitThreadHandler(handler)
+	handler_internal := handlers.InitInternalHandlers(handler)
 
 	fmt.Println("Registering handlers...")
 
 	// account
 	handler.Router.HandleFunc("/api/account/login", handlers.WrapFn(handler_account.RegisterAccountLogin))
 	handler.Router.HandleFunc("/api/account/register", handlers.WrapFn(handler_account.RegisterAccountRegister))
-	handler.Router.HandleFunc("/api/account/me", handlers.WrapFn(handler_account.RegisterAccountMe))
+	// handler.Router.HandleFunc("/api/account/me", handlers.WrapFn(handler_account.RegisterAccountMe))
 	handler.Router.HandleFunc("/api/account", handlers.WrapFn(handler_account.RegisterAccountRoot))
 
 	// articles
@@ -55,6 +56,9 @@ func main() {
 
 	// threads
 	handler.Router.HandleFunc("/api/threads/{slug}", handlers.WrapFn(handler_thread.RegisterThreadRoot))
+
+	// internal server routes
+	handler.Router.HandleFunc("/api/internal/session/{session_id}", handlers.WrapFn(handler_internal.HandleGetSession))
 
 	// request config
 	handler.Router.Use(mux.CORSMethodMiddleware(handler.Router))

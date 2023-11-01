@@ -45,7 +45,7 @@ func BsonD(k string, v any) bson.D {
 }
 
 // Creates a bson.D including the given key/value pair map as bson.E values
-func ComposeBsonD(vals map[string]any) bson.D {
+func ComposeBsonD[T comparable](vals map[string]T) bson.D {
 	var d bson.D
 	for k, v := range vals {
 		d = append(d, BsonE(k, v))
@@ -82,6 +82,20 @@ func BsonProjection(keys []string, val int) bson.D {
 	return bson.D{{
 		Key:   "$project",
 		Value: projectVal,
+	}}
+}
+
+// creates a projection map from a map[string]T - for more specific control over the projection
+func BsonProjectionMap[T comparable](vals map[string]T) bson.D {
+	pjmap := make(map[string]T)
+	for k, v := range vals {
+		pjmap[k] = v
+	}
+	projection := ComposeBsonD(pjmap)
+
+	return bson.D{{
+		Key:   "$project",
+		Value: projection,
 	}}
 }
 

@@ -1,10 +1,9 @@
 package handlers
 
 import (
-	"fmt"
-
 	"github.com/dd-web/opforu-server/internal/builder"
 	"github.com/dd-web/opforu-server/internal/types"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type ArticleHandler struct {
@@ -18,7 +17,7 @@ func InitArticleHandler(rh *types.RoutingHandler) *ArticleHandler {
 }
 
 /***********************************************************************************************/
-/* ROOT path: host.com/api/article
+/* ROOT path: host.com/api/articles
 /***********************************************************************************************/
 func (ah *ArticleHandler) RegisterArticleRoot(rc *types.RequestCtx) error {
 	rc.UpdateStore(ah.rh.Store)
@@ -31,23 +30,22 @@ func (ah *ArticleHandler) RegisterArticleRoot(rc *types.RequestCtx) error {
 	}
 }
 
-// GET: host.com/api/article
+// GET: host.com/api/articles
 func (ah *ArticleHandler) handleArticleList(rc *types.RequestCtx) error {
-	articlepipe := builder.QrStrLookupArticle(rc.Query)
+	var count int64
+	var pipeline bson.A
+	var articles []bson.M
 
-	count, err := rc.Store.CountArticleMatch(rc.Query.Search)
+	pipeline = builder.QrStrLookupArticle(rc.Query)
+	count = rc.Store.CountResults("articles", rc.Query.Search)
+
+	articles, err := rc.Store.RunAggregation("articles", pipeline)
 	if err != nil {
-		fmt.Println("Error counting articles", err)
 		return err
 	}
 
 	rc.Pagination.Update(int(count))
-
-	articles, err := rc.Store.RunAggregation("articles", articlepipe)
-	if err != nil {
-		return err
-	}
-
 	rc.Records = articles
+
 	return ResolveResponse(rc)
 }

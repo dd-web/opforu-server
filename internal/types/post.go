@@ -15,14 +15,11 @@ var (
 type Post struct {
 	ID primitive.ObjectID `bson:"_id,omitempty" json:"_id"`
 
-	PostNumber uint64 `bson:"post_number" json:"post_number"`
+	PostNumber uint64             `bson:"post_number" json:"post_number"`
+	Creator    primitive.ObjectID `bson:"creator" json:"creator"`
 
-	Body string `bson:"body" json:"body"`
-
+	Body   string               `bson:"body" json:"body"`
 	Assets []primitive.ObjectID `bson:"assets" json:"assets"`
-
-	Account primitive.ObjectID `bson:"account" json:"account"`
-	Creator primitive.ObjectID `bson:"creator" json:"creator"`
 
 	Board  primitive.ObjectID `bson:"board" json:"board"`
 	Thread primitive.ObjectID `bson:"thread" json:"thread"`

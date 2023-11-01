@@ -23,7 +23,7 @@ func InitBoardHandler(rh *types.RoutingHandler) *BoardHandler {
 }
 
 /***********************************************************************************************/
-/* ROOT path: host.com/api/board
+/* ROOT path: host.com/api/boards
 /***********************************************************************************************/
 func (bh *BoardHandler) RegisterBoardRoot(rc *types.RequestCtx) error {
 	rc.UpdateStore(bh.rh.Store)
@@ -36,7 +36,8 @@ func (bh *BoardHandler) RegisterBoardRoot(rc *types.RequestCtx) error {
 	}
 }
 
-// GET: host.com/api/board
+// METHOD: GET
+// PATH: host.com/api/boards
 func (bh *BoardHandler) handleBoardList(rc *types.RequestCtx) error {
 	col := rc.Store.DB.Collection("boards")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -64,11 +65,12 @@ func (bh *BoardHandler) handleBoardList(rc *types.RequestCtx) error {
 		boards = append(boards, board)
 	}
 
-	return HandleSendJSON(rc.Writer, http.StatusOK, boards, rc)
+	rc.AddToResponseList("boards", boards)
+	return ResolveResponse(rc)
 }
 
 /***********************************************************************************************/
-/* ROOT path: host.com/api/board/{short}
+/* ROOT path: host.com/api/boards/{short}
 /***********************************************************************************************/
 func (bh *BoardHandler) RegisterBoardShort(rc *types.RequestCtx) error {
 	rc.UpdateStore(bh.rh.Store)
@@ -81,37 +83,36 @@ func (bh *BoardHandler) RegisterBoardShort(rc *types.RequestCtx) error {
 	}
 }
 
-// GET: host.com/api/board/{short}
+// METHOD: GET
+// PATH: host.com/api/boards/{short}
 func (bh *BoardHandler) handleBoardShort(rc *types.RequestCtx) error {
+	var pipeline bson.A
+	var count int64
+	var threads []bson.M
+	var board *types.Board
+
 	vars := mux.Vars(rc.Request)
-	threadpipe, err := builder.QrStrLookupThreads(rc.Store.BoardIDs[vars["short"]], rc.Query)
-
-	if err != nil {
-		fmt.Println("Error building thread lookup pipeline", err)
-		return err
-	}
-
-	count, err := rc.Store.CountThreadMatch(rc.Store.BoardIDs[vars["short"]], rc.Query.Search)
-	if err != nil {
-		fmt.Println("Error getting total record count", err)
-		return err
-	}
 
 	board, err := rc.Store.FindBoardByShort(vars["short"])
 	if err != nil {
-		fmt.Println("Error finding board by short", err)
+		return err
+	}
+
+	pipeline, err = builder.QrStrLookupThreads(board.ID, rc.Query)
+	if err != nil {
+		return err
+	}
+
+	count = rc.Store.CountResults("threads", append(bson.D{{Key: "board", Value: board.ID}}, rc.Query.Search...))
+
+	threads, err = rc.Store.RunAggregation("threads", pipeline)
+	if err != nil {
 		return err
 	}
 
 	rc.Pagination.Update(int(count))
-
-	threads, err := rc.Store.RunAggregation("threads", threadpipe)
-	if err != nil {
-		return err
-	}
-
 	rc.Records = threads
 	rc.AddToResponseList("board", board)
+
 	return ResolveResponse(rc)
-	// return HandleSendJSON(rc.Writer, http.StatusOK, bson.M{"board": board, "threads": rc.Records, "paginator": rc.Pagination})
 }

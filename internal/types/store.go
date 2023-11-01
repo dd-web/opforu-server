@@ -13,24 +13,42 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type Store struct {
-	Client *mongo.Client
-	DB     *mongo.Database
-	Name   string
-
-	// keeps track of boards short name to it's object id
-	BoardIDs map[string]primitive.ObjectID
-
-	// account cache keeps track of users currently using the site to avoid constant db lookups.
-	// the lifetime of an entry should not exceed the lifetime of a session and should be deleted
-	// when the session is destroyed or expires.
-	// key is the session id and value is the account that matches that session
-	AccountCache map[string]*Account
+// Server Cache
+// high level cache for extremely frequently used data
+// TODO: implement refreshes & invalidation
+type ServerCache struct {
+	Boards   map[string]*Board               // short -> Board
+	Sessions map[string]*Session             // session_id -> Session
+	Accounts map[primitive.ObjectID]*Account // _id -> Account
 
 	StartedAt *time.Time
 	EndedAt   *time.Time
 }
 
+// New Server Cache
+// creates a new server cache with empty maps and the current time
+func NewServerCache() *ServerCache {
+	ts := time.Now().UTC()
+	return &ServerCache{
+		Boards:    map[string]*Board{},
+		Sessions:  map[string]*Session{},
+		Accounts:  map[primitive.ObjectID]*Account{},
+		StartedAt: &ts,
+	}
+}
+
+type Store struct {
+	Client *mongo.Client
+	DB     *mongo.Database
+	Name   string
+
+	Cache *ServerCache // high level cache for frequently used data
+
+	StartedAt *time.Time
+	EndedAt   *time.Time
+}
+
+// New Store
 // creates a new store for database operations
 func NewStore(dbname string) (*Store, error) {
 	var ended time.Time
@@ -59,14 +77,17 @@ func NewStore(dbname string) (*Store, error) {
 		Name:      dbname,
 		StartedAt: &ts,
 		EndedAt:   &ended,
-		BoardIDs:  map[string]primitive.ObjectID{},
+		Cache:     NewServerCache(),
 	}, nil
 }
 
-// Runs an aggregation pipeline and returns the results
+// Run Aggregation
+// - accepts a string of the collection name
+// - accepts a (usually binary object notation) pipeline to be ran
+// - returns a slice of bson.M containing the results
+// - returns an error if one occurs
 func (s *Store) RunAggregation(col string, pipe any) ([]bson.M, error) {
 	collection := s.DB.Collection(col)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -87,7 +108,10 @@ func (s *Store) RunAggregation(col string, pipe any) ([]bson.M, error) {
 	return records, nil
 }
 
-// Persists multiple new documents to a specified collection/column
+// Save Multiple Documents
+// - accepts a slice of (usually binary object notations) documents but could be other types
+// - accepts a string of the collection name
+// - returns an error if one occurs
 func (s *Store) SaveNewMulti(documents []any, col string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -102,7 +126,10 @@ func (s *Store) SaveNewMulti(documents []any, col string) error {
 	return nil
 }
 
-// Persists a single new document to a specified collection/column
+// Save a Single Document
+// - accepts a (usually binary object notation) document but could be other types
+// - accepts a string of the collection name
+// - returns an error if one occurs
 func (s *Store) SaveNewSingle(document any, col string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -117,8 +144,11 @@ func (s *Store) SaveNewSingle(document any, col string) error {
 	return nil
 }
 
-// fetches and stores frequently used board data in memory for quicker access
-func (s *Store) HydrateBoardIDs() error {
+// Hydrate Cache
+// - returns an error if one occurs
+//
+//	Attempts to hydrate the cache with frequently used data from the database, like boards.
+func (s *Store) HydrateCache() error {
 	collection := s.DB.Collection("boards")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -139,104 +169,99 @@ func (s *Store) HydrateBoardIDs() error {
 			fmt.Println("Error decoding board", err)
 			continue
 		}
-		s.BoardIDs[board.Short] = board.ID
+		s.Cache.Boards[board.Short] = &board
 	}
 
 	return nil
 }
 
-// Finds a single Board document by it's short name, unmarshals it into a Board struct and returns a pointer to it
+// Find Board By Short Name
+// - accepts a string of the board short name
+// - returns a pointer to the board
+//
+//	Attempts to find the board in the cache first, if it's not found it will be looked up in the database and cached for future use.
 func (s *Store) FindBoardByShort(short string) (*Board, error) {
-	collection := s.DB.Collection("boards")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var result Board
-	err := collection.FindOne(ctx, bson.D{{Key: "short", Value: short}}).Decode(&result)
-	if err != nil {
-		return nil, err
+	var board *Board
+	c_board, ok := s.Cache.Boards[short]
+	if ok {
+		board = c_board
 	}
 
-	result.Threads = []primitive.ObjectID{}
+	if board == nil {
+		collection := s.DB.Collection("boards")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-	return &result, nil
+		err := collection.FindOne(ctx, bson.D{{Key: "short", Value: short}}).Decode(&board)
+		if err != nil {
+			return nil, err
+		}
+		s.Cache.Boards[short] = board
+	}
+	return board, nil
 }
 
-// Finds the total number of threads matching the given filter
-func (s *Store) CountThreadMatch(boardId primitive.ObjectID, filter bson.D) (int64, error) {
-	countOpts := options.Count().SetMaxTime(5 * time.Second)
-	collection := s.DB.Collection("threads")
+// Count Results
+// - accepts a string of the collection name
+// - accepts a bson.D of the filter
+// - returns an int64 of the count
+//
+//	Counts the number of documents matching the given filter in the specified collection.
+//	useful for pagination since when we query for results we're only receiving a subset of the total results.
+func (s *Store) CountResults(col string, filter bson.D) int64 {
+	var result int64 = 0
 
+	count_options := options.Count().SetMaxTime(5 * time.Second)
+	collection := s.DB.Collection(col)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	countFilter := append(bson.D{{Key: "board", Value: boardId}}, filter...)
-
-	count, err := collection.CountDocuments(ctx, countFilter, countOpts)
-	if err != nil {
-		fmt.Println("Error getting total record count", err)
-		return 0, err
-	}
-
-	return count, nil
+	result, _ = collection.CountDocuments(ctx, filter, count_options)
+	return result
 }
 
-// Finds the total number of articles matching the given filter
-func (s *Store) CountArticleMatch(filter bson.D) (int64, error) {
-	countOpts := options.Count().SetMaxTime(5 * time.Second)
-	collection := s.DB.Collection("articles")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	count, err := collection.CountDocuments(ctx, filter, countOpts)
-	if err != nil {
-		fmt.Println("Error getting total record count", err)
-		return 0, err
-	}
-
-	return count, nil
-}
-
-// find a session by it's session_id
-func (s *Store) FindSession(session string) (*Session, error) {
-	if session == "" {
+// Find Session
+// - accepts a string of the session id
+// - returns a pointer to the session
+// - returns an error if one occurs
+//
+//	Attempts to find the session in the cache first, if it's not found it will be looked up in the database and cached for future use.
+func (s *Store) FindSession(id string) (*Session, error) {
+	if id == "" {
 		return nil, fmt.Errorf("session id is empty")
 	}
 
-	collection := s.DB.Collection("sessions")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	var session *Session
 
-	var result Session
-	err := collection.FindOne(ctx, bson.D{{Key: "session_id", Value: session}}).Decode(&result)
-	if err != nil {
-		return nil, err
+	c_session, ok := s.Cache.Sessions[id]
+	if ok {
+		session = c_session
 	}
 
-	fmt.Println("Matching Session:", result)
+	if session == nil {
+		collection := s.DB.Collection("sessions")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-	return &result, nil
-}
-
-// find an account by it's _id
-func (s *Store) FindAccountByID(id primitive.ObjectID) (*Account, error) {
-	collection := s.DB.Collection("accounts")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var result Account
-	err := collection.FindOne(ctx, bson.D{{Key: "_id", Value: id}}).Decode(&result)
-	if err != nil {
-		return nil, err
+		err := collection.FindOne(ctx, bson.D{{Key: "session_id", Value: id}}).Decode(&session)
+		if err != nil {
+			fmt.Println("FindSession error:", err)
+			return nil, err
+		}
+		s.Cache.Sessions[id] = session
 	}
 
-	return &result, nil
+	return session, nil
 }
 
-// fins an account by it's username or email address
-// if email is empty string username will be supplied for both parameters
+// Find Account By Username or Email
+// - accepts a string of the username
+// - accepts a string of the email (optional - can be empty string)
+// - returns a pointer to the account
+// - returns an error if one occurs
+//
+//	Always queries the database since we don't index by username or email in the cache and it's not a frequently used query.
+//	Email is optional, if it's empty it will use the username (first parameter) to search by both username and email.
 func (s *Store) FindAccountByUsernameOrEmail(username string, email string) (*Account, error) {
 	collection := s.DB.Collection("accounts")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -256,50 +281,55 @@ func (s *Store) FindAccountByUsernameOrEmail(username string, email string) (*Ac
 	return &result, nil
 }
 
-// find an account by it's session id
-// will return from cache if available, else query for the account and cache it before returning
-func (s *Store) FindAccountFromSession(session string) (*Account, error) {
-	fmt.Println("Finding account from session")
-	if session == "" {
+// Find Account By Session ID
+// - accepts a string of the session id
+// - returns a pointer to the associated account
+// - returns an error if one occurs
+//
+// attempts to look up both account and session from the cache first, if unavailable they will be looked up in the database and cached for future use.
+func (s *Store) FindAccountFromSession(id string) (*Account, error) {
+	if id == "" {
 		return nil, fmt.Errorf("session id is empty")
 	}
 
-	cached, ok := s.AccountCache[session]
+	var session *Session
+	var account *Account
+
+	c_session, ok := s.Cache.Sessions[id]
 	if ok {
-		return cached, nil
+		session = c_session
+		c_account, ok := s.Cache.Accounts[session.AccountID]
+		if ok {
+			account = c_account
+		}
 	}
 
-	collection := s.DB.Collection("sessions")
+	if account != nil {
+		return account, nil
+	}
+
+	if session == nil { // it's possible session is cached but not the account - check it
+		collection := s.DB.Collection("sessions")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		err := collection.FindOne(ctx, bson.D{{Key: "session_id", Value: id}}).Decode(&session)
+		if err != nil {
+			return nil, err
+		}
+		s.Cache.Sessions[id] = session
+	}
+
+	collection := s.DB.Collection("accounts")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	var result Session
-	err := collection.FindOne(ctx, bson.D{{Key: "session_id", Value: session}}).Decode(&result)
+	err := collection.FindOne(ctx, bson.D{{Key: "_id", Value: session.AccountID}}).Decode(&account)
 	if err != nil {
 		return nil, err
 	}
 
-	account, err := s.FindAccountByID(result.AccountID)
-	if err != nil {
-		return nil, err
-	}
-
-	s.AccountCache[session] = account
+	s.Cache.Accounts[session.AccountID] = account
 
 	return account, nil
 }
-
-// find an active session by it's account id
-// func (s *Store) FindSessionFromUser(act primitive.ObjectID) (*Session, error) {
-// 	collection := s.DB.Collection("sessions")
-// 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-// 	defer cancel()
-
-// 	var result Session
-// 	err := collection.FindOne(ctx, bson.D{{Key: "account", Value: act}, {Key: "active", Value: true}}).Decode(&result)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &result, nil
-// }

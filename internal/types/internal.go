@@ -39,9 +39,6 @@ type RequestCtx struct {
 	AccountCtx   *AccountCtx
 	ResponseList []bson.M
 	ResponseData bson.M
-	DeleteCookie bool
-	SetCookie    bool
-	// ResponseFormatted bson.D
 }
 
 // creates a new request context - parses and resolves request details into the context
@@ -57,8 +54,6 @@ func NewRequestCtx(w http.ResponseWriter, r *http.Request) *RequestCtx {
 		ResponseList: []bson.M{},
 		ResponseData: bson.M{},
 		AccountCtx:   NewAccountCtx(),
-		DeleteCookie: false,
-		SetCookie:    false,
 	}).Resolve()
 }
 
@@ -76,13 +71,23 @@ func (rc *RequestCtx) AddToResponseList(k string, v any) {
 
 // prepares the response list to be sent to the client
 func (rc *RequestCtx) Finalize() {
-	rc.AddToResponseList("paginator", rc.Pagination)
-	rc.AddToResponseList("records", rc.Records)
+	if rc.Pagination.SendToClient {
+		rc.AddToResponseList("paginator", rc.Pagination)
+	}
+
+	if len(rc.Records) > 0 {
+		rc.AddToResponseList("records", rc.Records)
+	}
 
 	if rc.AccountCtx.Account != nil {
 		rc.AddToResponseList("account", rc.AccountCtx.Account)
 	}
 
+	if rc.AccountCtx.Session != nil {
+		rc.AddToResponseList("session", rc.AccountCtx.Session)
+	}
+
+	// these are explicity added, shouldn't need to check for nil
 	for _, v := range rc.ResponseList {
 		for key, value := range v {
 			rc.ResponseData[key] = value
@@ -101,15 +106,34 @@ func (rc *RequestCtx) ResolveAccountCtx() {
 	}
 
 	fmt.Println("Resolved Session ID:", sessionid)
-	if sessionid != "" {
-		session, err := rc.Store.FindSession(sessionid)
-		if err != nil {
-			fmt.Println("Error finding session", err)
-			rc.DeleteCookie = true
-		} else {
-			fmt.Println("Found Session:", session)
-		}
+
+	if sessionid == "" {
+		return
 	}
+
+	session, err := rc.Store.FindSession(sessionid)
+	if err != nil {
+		fmt.Println("Error finding session", err)
+		return
+	}
+
+	if session.IsExpired() {
+		fmt.Println("Session Expired!")
+		rc.AccountCtx.ExpiredSession = true
+		return
+	}
+
+	rc.AccountCtx.Session = session
+
+	account, err := rc.Store.FindAccountFromSession(session.SessionID)
+	if err != nil {
+		fmt.Println("Error finding account", err)
+		// delete the session and cookie
+		return
+	}
+
+	rc.AccountCtx.Account = account
+	rc.AccountCtx.Role = account.Role
 }
 
 // parse the request and populate each of the contexts with relevant information
@@ -205,25 +229,28 @@ func NewQueryCtx() *QueryCtx {
 
 // interim struct to hold pagination information
 type PageCtx struct {
-	Current   int  `json:"current_page"`   // current page number
-	Count     int  `json:"page_size"`      // number of records per page
-	Pages     int  `json:"total_pages"`    // total number of pages
-	Records   int  `json:"total_records"`  // total number of records (determines total number of pages)
-	Last      bool `json:"last_page"`      // is this the last page
-	Remainder int  `json:"last_page_size"` // number of records on the last page
+	Current      int  `json:"current_page"`            // current page number
+	Count        int  `json:"page_size"`               // number of records per page
+	Pages        int  `json:"total_pages"`             // total number of pages
+	Records      int  `json:"total_records,omitempty"` // total number of records (determines total number of pages)
+	Last         bool `json:"last_page"`               // is this the last page
+	Remainder    int  `json:"last_page_size"`          // number of records on the last page
+	SendToClient bool `json:"-"`                       // should this be sent to the client
 }
 
 // creates a new page context with default values
 func NewPageCtx() *PageCtx {
 	return &PageCtx{
-		Current: 1,
-		Count:   10,
+		Current:      1,
+		Count:        10,
+		SendToClient: false,
 	}
 }
 
 // updates pagination info based on the query and it's results
 // NOTE: this needs to be called after query resolver has been called otherwise the object will be empty
 func (p *PageCtx) Update(results int) {
+	p.SendToClient = true
 	remainder := results % p.Count
 
 	p.Records = results
@@ -241,15 +268,17 @@ func (p *PageCtx) Update(results int) {
 
 // context of the requesting user. if unable to resolve a user pointers will be nil
 type AccountCtx struct {
-	Session *Session
-	Account *Account
-	Role    AccountRole
+	Session        *Session    `json:"session,omitempty"`
+	Account        *Account    `json:"account,omitempty"`
+	ExpiredSession bool        `json:"expired_session,omitempty"`
+	Role           AccountRole `json:"-"`
 }
 
 // creates a new user context with default values and a public role
 func NewAccountCtx() *AccountCtx {
 	return &AccountCtx{
-		Role: AccountRolePublic,
+		Role:           AccountRolePublic,
+		ExpiredSession: false,
 	}
 }
 

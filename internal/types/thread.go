@@ -17,23 +17,22 @@ var (
 )
 
 type Thread struct {
-	ID primitive.ObjectID `bson:"_id,omitempty" json:"_id"`
+	ID     primitive.ObjectID `bson:"_id,omitempty" json:"_id"`
+	Status ThreadStatus       `bson:"status" json:"status"`
 
 	Title string `bson:"title" json:"title"`
 	Body  string `bson:"body" json:"body"`
 	Slug  string `bson:"slug" json:"slug"`
 
-	Board primitive.ObjectID `bson:"board" json:"board"`
-
-	Account primitive.ObjectID `bson:"account" json:"account"`
+	Board   primitive.ObjectID `bson:"board" json:"board"`
 	Creator primitive.ObjectID `bson:"creator" json:"creator"`
 
 	Posts []primitive.ObjectID `bson:"posts" json:"posts"`
 	Mods  []primitive.ObjectID `bson:"mods" json:"mods"`
 
-	Status ThreadStatus `bson:"status" json:"status"`
-	Tags   []string     `bson:"tags" json:"tags"`
+	Assets []primitive.ObjectID `bson:"assets" json:"assets"`
 
+	Tags  []string     `bson:"tags" json:"tags"`
 	Flags []ThreadFlag `bson:"flags" json:"flags"`
 
 	CreatedAt *time.Time `bson:"created_at" json:"created_at"`

@@ -1,11 +1,37 @@
 package types
 
-import "net/http"
+import (
+	"net/http"
+
+	"go.mongodb.org/mongo-driver/bson"
+)
+
+type ServerError string
+
+// given strings for each error type
+const (
+	Error_Unexpected   ServerError = "unexpected server error"
+	Error_NotFound     ServerError = "not found"
+	Error_Invalid      ServerError = "invalid"
+	Error_Unauthorized ServerError = "unauthorized"
+)
+
+// Status codes mapped to their respective ServerError
+var ServerErrorStatusMap map[int]ServerError = map[int]ServerError{
+	http.StatusInternalServerError: Error_Unexpected,
+	http.StatusNotFound:            Error_NotFound,
+	http.StatusBadRequest:          Error_Invalid,
+	http.StatusUnauthorized:        Error_Unauthorized,
+}
+
+func (se ServerError) String() string {
+	return string(se)
+}
 
 // This should be the ONLY error type a client receives. Ever. Read top of file for more info.
 type APIError struct {
 	Status  int
-	Message string `json:"error"`
+	Message string
 }
 
 // implements the error interface
@@ -13,8 +39,12 @@ func (e APIError) Error() string {
 	return e.Message
 }
 
-// creates a new APIError and returns a pointer to it. you should return the memory address of this
-// when returning an error from a handler. it's a pointer here because it doesn't need to be copied
+// formats into bson (json likeish) for response
+func (e APIError) Bson() bson.M {
+	return bson.M{"error": e.Message}
+}
+
+// Creates a new APIError with the given status and message
 func NewAPIError(status int, message string) *APIError {
 	return &APIError{
 		Status:  status,
@@ -27,10 +57,24 @@ func NewAPIError(status int, message string) *APIError {
 /*  comments explaining what the error is, how to avoid it, and any arguments it takes.
 /***********************************************************************************************/
 
-// Error Not Found
-// happens when the server can't find the requested resources. this is a 404 error.
-// try making your query less specific or check the spelling of the resource you're requesting.
-// takes a string name of the resource
-func ErrorNotFound(s string) APIError {
-	return *NewAPIError(http.StatusNotFound, "not found: "+s)
+// New Not Found Error
+// - accepts a string of the resource that was not found
+func ErrorNotFound(resource string) APIError {
+	return *NewAPIError(http.StatusNotFound, resource+" "+Error_NotFound.String())
+}
+
+// New Invalid Error
+// - accepts a string of what was invalid
+func ErrorInvalid(what string) APIError {
+	return *NewAPIError(http.StatusBadRequest, what+" is "+Error_Invalid.String())
+}
+
+// New Unauthorized Error
+func ErrorUnauthorized() APIError {
+	return *NewAPIError(http.StatusUnauthorized, Error_Unauthorized.String())
+}
+
+// New Unexpected Error
+func ErrorUnexpected() APIError {
+	return *NewAPIError(http.StatusInternalServerError, Error_Unexpected.String())
 }

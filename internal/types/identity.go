@@ -12,7 +12,7 @@ var (
 	IDENTITY_CHAR_SET = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ123456789-_"
 
 	// permissions
-	PUBLIC_IDENTITY_FIELDS   = []string{"name", "style", "role", "status", "thread", "created_at", "updated_at", "deleted_at"}
+	PUBLIC_IDENTITY_FIELDS   = []string{"name", "style", "role", "status", "created_at", "updated_at", "deleted_at"}
 	PERSONAL_IDENTITY_FIELDS = []string{"_id", "account"}
 )
 

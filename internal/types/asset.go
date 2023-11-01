@@ -42,9 +42,9 @@ type AssetSource struct {
 // Asset reference will be created. This is to prevent duplicate files from being uploaded and to let them name
 // their file whatever they want for their own organization.
 type Asset struct {
-	ID       primitive.ObjectID `json:"_id" bson:"_id"`
-	SourceID primitive.ObjectID `json:"source_id" bson:"source_id"`
+	ID primitive.ObjectID `json:"_id" bson:"_id"`
 
+	SourceID  primitive.ObjectID `json:"source_id" bson:"source_id"`
 	AccountID primitive.ObjectID `json:"account_id" bson:"account_id"`
 
 	FileName string   `json:"file_name" bson:"file_name"`

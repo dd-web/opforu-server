@@ -14,12 +14,8 @@ type HandlerWrapperFunc func(rc *types.RequestCtx) error
 // populates request context with request details such as the account making the request (if any)
 func WrapFn(f HandlerWrapperFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// create request context here and pass in f()
 		rc := types.NewRequestCtx(w, r)
 		types.RequestLogger(rc)
-
-		// finally got the cookies working
-		// fmt.Printf("Cookies: %v\n", rc.Request.Cookies())
 
 		if err := f(rc); err != nil {
 			fmt.Println("Error in handler:", err)
@@ -36,30 +32,10 @@ func HandleSendJSON(w http.ResponseWriter, status int, v any, rc *types.RequestC
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(status)
 
-	if rc != nil {
-		if rc.DeleteCookie {
-			fmt.Println("Should Delete Cookie")
-			c := types.NewCookieDeleter()
-			http.SetCookie(w, c)
-		}
-		if rc.SetCookie {
-			fmt.Println("Should Set Cookie")
-			var c *http.Cookie
-			if rc.AccountCtx.Session != nil {
-				c = rc.AccountCtx.Session.CookieFromSession()
-			}
-			if c != nil {
-				http.SetCookie(w, c)
-			}
-			fmt.Println("Cookie to set:", c)
-		}
-	}
-
-	fmt.Println("Response Code:", status)
-
 	if v != nil {
 		return json.NewEncoder(w).Encode(v)
 	}
+
 	return json.NewEncoder(w).Encode(map[string]string{"error": "unknown server error"})
 }
 
