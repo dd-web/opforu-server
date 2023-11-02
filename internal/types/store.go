@@ -317,6 +317,8 @@ func (s *Store) FindAccountFromSession(id string) (*Account, error) {
 		if err != nil {
 			return nil, err
 		}
+		session.IsExpiringSoon()
+
 		s.Cache.Sessions[id] = session
 	}
 

@@ -37,6 +37,8 @@ func (ih *InternalHandler) HandleGetSession(rc *types.RequestCtx) error {
 		return err
 	}
 
+	session.IsExpiringSoon()
+
 	rc.AddToResponseList("session", session)
 	return ResolveResponse(rc)
 }
