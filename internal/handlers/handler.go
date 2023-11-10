@@ -49,3 +49,8 @@ func ResolveResponse(rc *types.RequestCtx) error {
 	rc.Finalize()
 	return HandleSendJSON(rc.Writer, http.StatusOK, rc.ResponseData, rc)
 }
+
+// resolves an error response and sends it to the client
+func ResolveResponseErr(rc *types.RequestCtx, err types.APIError) error {
+	return HandleSendJSON(rc.Writer, err.Status, err.Error(), rc)
+}

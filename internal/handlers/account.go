@@ -61,7 +61,8 @@ func (ah *AccountHandler) handlePostAccountLogin(rc *types.RequestCtx) error {
 	body, err := io.ReadAll(rc.Request.Body)
 	if err != nil {
 		fmt.Println("Error reading body", err)
-		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"}, rc)
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"}, rc)
 	}
 
 	// the username field could hold either the username or email
@@ -73,19 +74,22 @@ func (ah *AccountHandler) handlePostAccountLogin(rc *types.RequestCtx) error {
 	err = json.Unmarshal(body, &parsed)
 	if err != nil {
 		fmt.Println("Error parsing body", err)
-		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"}, rc)
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"}, rc)
 	}
 
 	account, err := rc.Store.FindAccountByUsernameOrEmail(parsed.Username, "")
 	if err != nil {
 		fmt.Println("Error finding account (find by username)", err)
-		return HandleSendJSON(rc.Writer, http.StatusUnauthorized, bson.M{"error": "invalid login credentials"}, rc)
+		return ResolveResponseErr(rc, types.ErrorUnauthorized())
+		// return HandleSendJSON(rc.Writer, http.StatusUnauthorized, bson.M{"error": "invalid login credentials"}, rc)
 	}
 
 	passwordMatches := utils.CompareHash(account.Password, parsed.Password)
 	if !passwordMatches {
 		fmt.Println("Password mismatch")
-		return HandleSendJSON(rc.Writer, http.StatusUnauthorized, bson.M{"error": "invalid login credentials"}, rc)
+		return ResolveResponseErr(rc, types.ErrorUnauthorized())
+		// return HandleSendJSON(rc.Writer, http.StatusUnauthorized, bson.M{"error": "invalid login credentials"}, rc)
 	}
 
 	session := types.NewSession(account)
@@ -93,7 +97,8 @@ func (ah *AccountHandler) handlePostAccountLogin(rc *types.RequestCtx) error {
 	err = rc.Store.SaveNewSingle(session, "sessions")
 	if err != nil {
 		fmt.Println("Error saving new session", err)
-		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
 	}
 
 	rc.AccountCtx.Account = account
@@ -122,7 +127,8 @@ func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error 
 	body, err := io.ReadAll(rc.Request.Body)
 	if err != nil {
 		fmt.Println("Error reading body", err)
-		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"}, rc)
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"}, rc)
 	}
 
 	var parsed struct {
@@ -135,19 +141,22 @@ func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error 
 	err = json.Unmarshal(body, &parsed)
 	if err != nil {
 		fmt.Println("Error parsing body", err)
-		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"}, rc)
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"}, rc)
 	}
 
 	account, _ := rc.Store.FindAccountByUsernameOrEmail(parsed.Username, parsed.Email)
 	if account != nil {
 		fmt.Println("Account already exists")
-		return HandleSendJSON(rc.Writer, http.StatusBadRequest, bson.M{"error": "account already exists"}, rc)
+		return ResolveResponseErr(rc, types.ErrorConflict("email or username already exists"))
+		// return HandleSendJSON(rc.Writer, http.StatusBadRequest, bson.M{"error": "account already exists"}, rc)
 	}
 
 	pwh, err := utils.HashPassword(parsed.Password)
 	if err != nil {
 		fmt.Println("Error hashing password", err)
-		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
 	}
 
 	newAccount := types.NewAccount()
@@ -160,13 +169,15 @@ func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error 
 	err = rc.Store.SaveNewSingle(newAccount, "accounts")
 	if err != nil {
 		fmt.Println("Error saving new account", err)
-		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
 	}
 
 	err = rc.Store.SaveNewSingle(session, "sessions")
 	if err != nil {
 		fmt.Println("Error saving new session", err)
-		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
 	}
 
 	rc.AccountCtx.Account = newAccount

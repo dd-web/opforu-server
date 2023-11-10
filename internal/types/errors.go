@@ -69,6 +69,11 @@ func ErrorInvalid(what string) APIError {
 	return *NewAPIError(http.StatusBadRequest, what+" is "+Error_Invalid.String())
 }
 
+// New Conflict Error
+func ErrorConflict(msg string) APIError {
+	return *NewAPIError(http.StatusConflict, msg)
+}
+
 // New Unauthorized Error
 func ErrorUnauthorized() APIError {
 	return *NewAPIError(http.StatusUnauthorized, Error_Unauthorized.String())

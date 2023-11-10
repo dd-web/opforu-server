@@ -11,6 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// format and strip sensitive data from a struct for sending to the client
 type ClientFormatter interface {
 	CLFormat() bson.M
 }
