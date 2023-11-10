@@ -28,17 +28,22 @@ func InitInternalHandlers(rh *types.RoutingHandler) *InternalHandler {
 // retreives a session from it's id
 func (ih *InternalHandler) HandleGetSession(rc *types.RequestCtx) error {
 	rc.UpdateStore(ih.rh.Store)
+	// this is a URL var - purely mux construct. not a header or query param
 	sessionid := mux.Vars(rc.Request)["session_id"]
 
-	fmt.Println("looking for session", sessionid)
+	// fmt.Println("looking for session", sessionid)
 
 	session, err := rc.Store.FindSession(sessionid)
 	if err != nil {
 		return err
 	}
 
-	session.IsExpiringSoon()
+	if session.IsExpired() {
+		return fmt.Errorf("session is expired")
+	}
 
-	rc.AddToResponseList("session", session)
+	rc.AccountCtx.Session = session
+	rc.AccountCtx.Account = session.Account
+
 	return ResolveResponse(rc)
 }

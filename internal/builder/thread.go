@@ -35,7 +35,7 @@ func QrStrEntireThread(slug string, cfg *types.QueryCtx) bson.A {
 		QrStrLookupIdentity("creator"),
 		BsonOperator("$addFields", "creator", BsonOperWithArray("$arrayElemAt", []interface{}{"$creator", 0})),
 		QrStrLookupIdentity("mods"),
-		BsonOperWithArray("$unset", []interface{}{"board", "account"}),
+		BsonOperWithArray("$unset", []interface{}{"board", "account", "creator._id", "mods._id"}),
 		QrStrLookupAssets(),
 	}
 }

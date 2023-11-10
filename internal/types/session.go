@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -75,4 +76,13 @@ func (s *Session) IsExpiringSoon() bool {
 // is the session expiring in the next 5 minutes?
 func (s *Session) IsExpiryImminent() bool {
 	return s.Expires.Before(time.Now().Add(-time.Duration(time.Minute * 5)))
+}
+
+// implements the ClientFormatter interface
+func (s *Session) CLFormat() bson.M {
+	return bson.M{
+		"session_id": s.SessionID,
+		"account_id": s.AccountID,
+		"expires":    s.Expires,
+	}
 }

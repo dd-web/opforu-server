@@ -3,6 +3,7 @@ package types
 import (
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -56,5 +57,17 @@ func NewAccount() *Account {
 		Status:    AccountStatusActive,
 		CreatedAt: &ts,
 		UpdatedAt: &ts,
+	}
+}
+
+// ClientFormatter implementation
+func (a *Account) CLFormat() bson.M {
+	return bson.M{
+		"username":   a.Username,
+		"email":      a.Email,
+		"role":       a.Role,
+		"status":     a.Status,
+		"created_at": a.CreatedAt,
+		"updated_at": a.UpdatedAt,
 	}
 }

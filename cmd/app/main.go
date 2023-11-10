@@ -44,7 +44,6 @@ func main() {
 	// account
 	handler.Router.HandleFunc("/api/account/login", handlers.WrapFn(handler_account.RegisterAccountLogin))
 	handler.Router.HandleFunc("/api/account/register", handlers.WrapFn(handler_account.RegisterAccountRegister))
-	// handler.Router.HandleFunc("/api/account/me", handlers.WrapFn(handler_account.RegisterAccountMe))
 	handler.Router.HandleFunc("/api/account", handlers.WrapFn(handler_account.RegisterAccountRoot))
 
 	// articles

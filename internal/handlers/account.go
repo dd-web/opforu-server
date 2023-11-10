@@ -138,19 +138,22 @@ func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error 
 		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"}, rc)
 	}
 
-	account, err := rc.Store.FindAccountByUsernameOrEmail(parsed.Username, parsed.Email)
-	if err != nil {
-		fmt.Println("This isn't really an error, this is what we want (no accounts with existing username or email)", err)
-	}
-
+	account, _ := rc.Store.FindAccountByUsernameOrEmail(parsed.Username, parsed.Email)
 	if account != nil {
 		fmt.Println("Account already exists")
 		return HandleSendJSON(rc.Writer, http.StatusBadRequest, bson.M{"error": "account already exists"}, rc)
 	}
 
+	pwh, err := utils.HashPassword(parsed.Password)
+	if err != nil {
+		fmt.Println("Error hashing password", err)
+		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
+	}
+
 	newAccount := types.NewAccount()
 	newAccount.Username = parsed.Username
 	newAccount.Email = parsed.Email
+	newAccount.Password = pwh
 
 	session := types.NewSession(newAccount)
 
@@ -166,7 +169,7 @@ func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error 
 		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
 	}
 
-	rc.AccountCtx.Account = account
+	rc.AccountCtx.Account = newAccount
 	rc.AccountCtx.Session = session
 
 	return ResolveResponse(rc)

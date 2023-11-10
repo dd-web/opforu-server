@@ -11,6 +11,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+type ClientFormatter interface {
+	CLFormat() bson.M
+}
+
 // These define the valid resource paths for the API directly after root.
 type APIResource string
 
@@ -69,6 +73,13 @@ func (rc *RequestCtx) AddToResponseList(k string, v any) {
 	rc.ResponseList = append(rc.ResponseList, bson.M{k: v})
 }
 
+// uses the ClientFormatter interface to send potentially sensitive data to the client by
+// using the CLFormat() method to format the data for the client
+func (rc *RequestCtx) AddToResponseListCLF(k string, v ClientFormatter) {
+	data := v.CLFormat()
+	rc.ResponseList = append(rc.ResponseList, bson.M{k: data})
+}
+
 // prepares the response list to be sent to the client
 func (rc *RequestCtx) Finalize() {
 	if rc.Pagination.SendToClient {
@@ -80,11 +91,11 @@ func (rc *RequestCtx) Finalize() {
 	}
 
 	if rc.AccountCtx.Account != nil {
-		rc.AddToResponseList("account", rc.AccountCtx.Account)
+		rc.AddToResponseListCLF("account", rc.AccountCtx.Account)
 	}
 
 	if rc.AccountCtx.Session != nil {
-		rc.AddToResponseList("session", rc.AccountCtx.Session)
+		rc.AddToResponseListCLF("session", rc.AccountCtx.Session)
 	}
 
 	// these are explicity added, shouldn't need to check for nil
@@ -105,7 +116,7 @@ func (rc *RequestCtx) ResolveAccountCtx() {
 		}
 	}
 
-	fmt.Println("Resolved Session ID:", sessionid)
+	// fmt.Println("Resolved Session ID:", sessionid)
 
 	if sessionid == "" {
 		return
