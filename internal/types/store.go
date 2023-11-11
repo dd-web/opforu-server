@@ -144,6 +144,24 @@ func (s *Store) SaveNewSingle(document any, col string) error {
 	return nil
 }
 
+// Delete a single Document
+// - accepts a primitive.ObjectID of the document to be deleted
+// - accepts a string of the collection name
+// - returns an error if one occurs
+func (s *Store) DeleteSingle(id primitive.ObjectID, col string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	collection := s.DB.Collection(col)
+	_, err := collection.DeleteOne(ctx, bson.D{{Key: "_id", Value: id}})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Successfully deleted document from %s column\n", col)
+	return nil
+}
+
 // Hydrate Cache
 // - returns an error if one occurs
 //

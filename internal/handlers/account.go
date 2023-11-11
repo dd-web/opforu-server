@@ -185,3 +185,54 @@ func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error 
 
 	return ResolveResponse(rc)
 }
+
+/***********************************************************************************************/
+/* ROOT path: host.com/api/account/logout
+/***********************************************************************************************/
+func (ah *AccountHandler) RegisterAccountLogout(rc *types.RequestCtx) error {
+	rc.UpdateStore(ah.rh.Store)
+
+	switch rc.Request.Method {
+	case "POST":
+		return ah.handlePostAccountLogout(rc)
+	default:
+		return HandleUnsupportedMethod(rc.Writer, rc.Request)
+	}
+}
+
+// METHOD: POST
+// PATH: host.com/api/account/logout
+func (ah *AccountHandler) handlePostAccountLogout(rc *types.RequestCtx) error {
+	body, err := io.ReadAll(rc.Request.Body)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	var parsed struct {
+		SessionID string `json:"session_id"`
+	}
+
+	err = json.Unmarshal(body, &parsed)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	session, err := rc.Store.FindSession(parsed.SessionID)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnauthorized())
+	}
+
+	err = rc.Store.DeleteSingle(session.ID, "sessions")
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	for k := range rc.Store.Cache.Sessions {
+		if k == parsed.SessionID {
+			delete(rc.Store.Cache.Sessions, k)
+		}
+	}
+
+	// bypass the response resolver so it doesn't auto populate the deleted session
+	return HandleSendJSON(rc.Writer, http.StatusOK, bson.M{"message": "logged out"}, rc)
+}
