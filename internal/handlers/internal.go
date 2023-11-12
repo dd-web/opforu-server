@@ -39,7 +39,9 @@ func (ih *InternalHandler) HandleGetSession(rc *types.RequestCtx) error {
 	}
 
 	if session.IsExpired() {
-		return fmt.Errorf("session is expired")
+		fmt.Println("session expired")
+		_ = rc.Store.DeleteSingle(session.ID, "sessions")
+		return fmt.Errorf("session expired")
 	}
 
 	rc.AccountCtx.Session = session

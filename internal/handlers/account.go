@@ -60,9 +60,7 @@ func (ah *AccountHandler) RegisterAccountLogin(rc *types.RequestCtx) error {
 func (ah *AccountHandler) handlePostAccountLogin(rc *types.RequestCtx) error {
 	body, err := io.ReadAll(rc.Request.Body)
 	if err != nil {
-		fmt.Println("Error reading body", err)
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
-		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"}, rc)
 	}
 
 	// the username field could hold either the username or email
@@ -73,32 +71,24 @@ func (ah *AccountHandler) handlePostAccountLogin(rc *types.RequestCtx) error {
 
 	err = json.Unmarshal(body, &parsed)
 	if err != nil {
-		fmt.Println("Error parsing body", err)
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
-		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"}, rc)
 	}
 
 	account, err := rc.Store.FindAccountByUsernameOrEmail(parsed.Username, "")
 	if err != nil {
-		fmt.Println("Error finding account (find by username)", err)
 		return ResolveResponseErr(rc, types.ErrorUnauthorized())
-		// return HandleSendJSON(rc.Writer, http.StatusUnauthorized, bson.M{"error": "invalid login credentials"}, rc)
 	}
 
 	passwordMatches := utils.CompareHash(account.Password, parsed.Password)
 	if !passwordMatches {
-		fmt.Println("Password mismatch")
 		return ResolveResponseErr(rc, types.ErrorUnauthorized())
-		// return HandleSendJSON(rc.Writer, http.StatusUnauthorized, bson.M{"error": "invalid login credentials"}, rc)
 	}
 
 	session := types.NewSession(account)
 
 	err = rc.Store.SaveNewSingle(session, "sessions")
 	if err != nil {
-		fmt.Println("Error saving new session", err)
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
-		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
 	}
 
 	rc.AccountCtx.Account = account
