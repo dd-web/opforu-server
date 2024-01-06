@@ -3,6 +3,7 @@ package types
 import (
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -37,5 +38,19 @@ func NewPost() *Post {
 		Assets:    []primitive.ObjectID{},
 		CreatedAt: &ts,
 		UpdatedAt: &ts,
+	}
+}
+
+// ClientFormatter implementation
+func (p *Post) CLFormat() bson.M {
+	return bson.M{
+		"post_number": p.PostNumber,
+		"body":        p.Body,
+		"assets":      p.Assets,
+		"creator":     p.Creator,
+		"board":       p.Board,
+		"thread":      p.Thread,
+		"created_at":  p.CreatedAt,
+		"updated_at":  p.UpdatedAt,
 	}
 }

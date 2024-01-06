@@ -33,6 +33,7 @@ func (th *ThreadHandler) RegisterThreadRoot(rc *types.RequestCtx) error {
 // GET: host.com/api/thread/{slug}
 func (th *ThreadHandler) handleThreadRoot(rc *types.RequestCtx) error {
 	vars := mux.Vars(rc.Request)
+
 	pipeline := builder.QrStrEntireThread(vars["slug"], rc.Query)
 
 	result, err := th.rh.Store.RunAggregation("threads", pipeline)

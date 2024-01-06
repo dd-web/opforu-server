@@ -3,6 +3,7 @@ package types
 import (
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -46,5 +47,20 @@ func NewArticle() *Article {
 		Tags:      []string{},
 		CreatedAt: &ts,
 		UpdatedAt: &ts,
+	}
+}
+
+// ClientFormatter implementation
+func (a *Article) CLFormat() bson.M {
+	return bson.M{
+		"title":      a.Title,
+		"body":       a.Body,
+		"slug":       a.Slug,
+		"author":     a.AuthorID,
+		"co_authors": a.CoAuthors,
+		"status":     a.Status,
+		"tags":       a.Tags,
+		"created_at": a.CreatedAt,
+		"updated_at": a.UpdatedAt,
 	}
 }

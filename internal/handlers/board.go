@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -78,6 +80,8 @@ func (bh *BoardHandler) RegisterBoardShort(rc *types.RequestCtx) error {
 	switch rc.Request.Method {
 	case "GET":
 		return bh.handleBoardShort(rc)
+	case "POST":
+		return bh.handleNewThread(rc)
 	default:
 		return HandleUnsupportedMethod(rc.Writer, rc.Request)
 	}
@@ -113,6 +117,44 @@ func (bh *BoardHandler) handleBoardShort(rc *types.RequestCtx) error {
 	rc.Pagination.Update(int(count))
 	rc.Records = threads
 	rc.AddToResponseList("board", board)
+
+	return ResolveResponse(rc)
+}
+
+// METHOD: POST
+// PATH: host.com/api/boards/{short}
+func (bh *BoardHandler) handleNewThread(rc *types.RequestCtx) error {
+	vars := mux.Vars(rc.Request)
+
+	board, err := rc.Store.FindBoardByShort(vars["short"])
+	if err != nil {
+		return err
+	}
+
+	body, err := io.ReadAll(rc.Request.Body)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	var thread_parsed types.Thread // copy values from parsed to actual thread - to prevent client fuckery
+	var thread = types.NewThread()
+
+	err = json.Unmarshal(body, &thread)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	thread.Title = thread_parsed.Title
+	thread.Body = thread_parsed.Body // needs parsing
+	thread.Board = board.ID
+	thread.Creator = rc.AccountCtx.Account.ID
+	thread.Mods = append(thread.Mods, rc.AccountCtx.Account.ID)
+	thread.Tags = thread_parsed.Tags
+
+	err = thread.Validate()
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorInvalid(err.Error()))
+	}
 
 	return ResolveResponse(rc)
 }

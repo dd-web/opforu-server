@@ -4,6 +4,7 @@ import (
 	"time"
 
 	gonanoid "github.com/matoous/go-nanoid/v2"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -55,5 +56,18 @@ func NewIdentity() *Identity {
 		Name:      name,
 		CreatedAt: &ts,
 		UpdatedAt: &ts,
+	}
+}
+
+// ClientFormatter implementation
+func (i *Identity) CLFormat() bson.M {
+	return bson.M{
+		"name":       i.Name,
+		"style":      i.Style,
+		"role":       i.Role,
+		"status":     i.Status,
+		"thread":     i.Thread,
+		"created_at": i.CreatedAt,
+		"updated_at": i.UpdatedAt,
 	}
 }

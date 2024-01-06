@@ -50,7 +50,7 @@ type Session struct {
 func NewSession(account *Account) *Session {
 	id := uuid.NewString()
 	ts := time.Now().UTC()
-	exp := time.Now().Add(time.Duration(time.Minute * 1)).UTC()
+	exp := time.Now().Add(time.Duration(time.Hour * 24)).UTC()
 
 	return &Session{
 		ID:        primitive.NewObjectID(),
