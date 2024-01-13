@@ -47,8 +47,9 @@ type Asset struct {
 	SourceID  primitive.ObjectID `json:"source_id" bson:"source_id"`
 	AccountID primitive.ObjectID `json:"account_id" bson:"account_id"`
 
-	FileName string   `json:"file_name" bson:"file_name"`
-	Tags     []string `json:"tags" bson:"tags"`
+	Description string   `json:"description" bson:"description"`
+	FileName    string   `json:"file_name" bson:"file_name"`
+	Tags        []string `json:"tags" bson:"tags"`
 
 	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
 	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
