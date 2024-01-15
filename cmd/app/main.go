@@ -35,6 +35,7 @@ func main() {
 
 	handler_account := handlers.InitAccountHandlers(handler)
 	handler_article := handlers.InitArticleHandler(handler)
+	handler_asset := handlers.InitAssetHandler(handler)
 	handler_board := handlers.InitBoardHandler(handler)
 	handler_thread := handlers.InitThreadHandler(handler)
 	handler_internal := handlers.InitInternalHandlers(handler)
@@ -49,6 +50,9 @@ func main() {
 
 	// articles
 	handler.Router.HandleFunc("/api/articles", handlers.WrapFn(handler_article.RegisterArticleRoot))
+
+	// assets
+	handler.Router.HandleFunc("/api/assets", handlers.WrapFn(handler_asset.RegisterAssetRoot))
 
 	// boards
 	handler.Router.HandleFunc("/api/boards/{short}", handlers.WrapFn(handler_board.RegisterBoardShort))

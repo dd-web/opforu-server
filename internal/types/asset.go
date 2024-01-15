@@ -4,10 +4,17 @@ import (
 	"crypto/md5"
 	"crypto/sha256"
 	"io"
+	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+const (
+	MAX_FILE_SIZE_IMAGE = 8 * 1024 * 1024  // 8MB
+	MAX_FILE_SIZE_VIDEO = 24 * 1024 * 1024 // 24MB
 )
 
 // available asset types that can be uploaded - open for expansion
@@ -134,4 +141,34 @@ func GetFileSize(filename string) (int64, error) {
 	}
 
 	return file.Size(), nil
+}
+
+type FileUploadDetails struct {
+	AssetType   AssetType
+	LocalID     string
+	Description string
+	FileName    string
+	Height      int
+	Width       int
+}
+
+func ParseFormFileDetails(rq *http.Request) *FileUploadDetails {
+	details := &FileUploadDetails{
+		AssetType:   AssetType(rq.FormValue("type")),
+		LocalID:     rq.FormValue("local_id"),
+		Description: rq.FormValue("description"),
+		FileName:    rq.FormValue("name"),
+		Height:      0,
+		Width:       0,
+	}
+
+	if height, err := strconv.Atoi(rq.FormValue("height")); err == nil {
+		details.Height = height
+	}
+
+	if width, err := strconv.Atoi(rq.FormValue("width")); err == nil {
+		details.Width = width
+	}
+
+	return details
 }
