@@ -353,3 +353,25 @@ func (s *Store) FindAccountFromSession(id string) (*Account, error) {
 
 	return account, nil
 }
+
+// Find Asset Source with a hash collisions
+// - accepts a byte slice of the hash
+// - accepts a types.HashMethod of the hash method used
+// - returns a pointer to the asset source
+// - returns an error if one occurs
+//
+// still lots to do here. just getting something working for now.
+func (s *Store) AssetHashCollision(hash []byte, method HashMethod) (*AssetSource, error) {
+	collection := s.DB.Collection("asset_sources")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var result AssetSource
+
+	err := collection.FindOne(ctx, bson.D{{Key: "details.source.hash_md5", Value: hash}}).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}

@@ -3,6 +3,7 @@ package types
 import (
 	"crypto/md5"
 	"crypto/sha256"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -10,11 +11,23 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
 const (
 	MAX_FILE_SIZE_IMAGE = 8 * 1024 * 1024  // 8MB
 	MAX_FILE_SIZE_VIDEO = 24 * 1024 * 1024 // 24MB
+
+	FILE_NAME_CHAR_SET = "abcdefghijkmnpqrstuvwxyz123456789-_"
+	FILE_NAME_LENGTH   = 32
+
+	aws_endpoint = "nyc3.digitaloceanspaces.com"
+	aws_region   = "nyc3"
+	aws_bucket   = "opforu"
 )
 
 // available asset types that can be uploaded - open for expansion
@@ -25,16 +38,29 @@ const (
 	AssetTypeVideo AssetType = "video"
 )
 
+type HashMethod string
+
+const (
+	HashMethodMD5    HashMethod = "md5"
+	HashMethodSHA256 HashMethod = "sha256"
+)
+
+type AssetSourceDetails struct {
+	Avatar *FileCtx `json:"avatar" bson:"avatar"`
+	Source *FileCtx `json:"source" bson:"source"`
+}
+
 // the internal source asset. This is a source file from which all other assets are derived. This should NEVER be passed
 // to the client unless they are an admin. This is for privacy and storage reasons. The derived asset should be
 // populated with the information the client needs from this source asset.
 type AssetSource struct {
 	ID primitive.ObjectID `json:"_id" bson:"_id"`
 
-	Details struct {
-		Avatar FileCtx `json:"avatar" bson:"avatar"`
-		Source FileCtx `json:"source" bson:"source"`
-	}
+	// Details struct {
+	// 	Avatar FileCtx `json:"avatar" bson:"avatar"`
+	// 	Source FileCtx `json:"source" bson:"source"`
+	// }
+	Details *AssetSourceDetails `bson:"details" json:"details"`
 
 	AssetType AssetType            `json:"asset_type" bson:"asset_type"`
 	Uploaders []primitive.ObjectID `json:"uploaders" bson:"uploaders"`
@@ -63,6 +89,37 @@ type Asset struct {
 	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
+func NewSourceAsset() *AssetSource {
+	ts := time.Now().UTC()
+	as := &AssetSource{
+		ID: primitive.NewObjectID(),
+
+		Details: &AssetSourceDetails{
+			Avatar: NewFileCtx(),
+			Source: NewFileCtx(),
+		},
+
+		Uploaders: []primitive.ObjectID{},
+		CreatedAt: &ts,
+		UpdatedAt: &ts,
+	}
+
+	var aname, sname string = "", ""
+
+	aname, _ = NewFileName()
+	sname, _ = NewFileName()
+
+	if aname != "" {
+		as.Details.Avatar.ServerFileName = aname
+	}
+
+	if sname != "" {
+		as.Details.Source.ServerFileName = sname
+	}
+
+	return as
+}
+
 // creates a new asset, must provide an asset source id from which to derive and the account id of who uploaded it (or owns it)
 func NewAsset(src primitive.ObjectID, acct primitive.ObjectID) *Asset {
 	ts := time.Now().UTC()
@@ -79,21 +136,27 @@ func NewAsset(src primitive.ObjectID, acct primitive.ObjectID) *Asset {
 
 // Details about the file, since files can have avatar and source files this is abstracted out. Both may not need all of these.
 type FileCtx struct {
-	Height    uint64 `json:"height" bson:"height"`
-	Width     uint64 `json:"width" bson:"width"`
-	FileSize  uint64 `json:"file_size" bson:"file_size"`
-	URL       string `json:"url" bson:"url"`
-	Extension string `json:"extension" bson:"extension"`
+	ServerFileName string `json:"server_file_name" bson:"server_file_name"`
+	Height         uint64 `json:"height" bson:"height"`
+	Width          uint64 `json:"width" bson:"width"`
+	FileSize       uint64 `json:"file_size" bson:"file_size"`
+	URL            string `json:"url" bson:"url"`
+	Extension      string `json:"extension" bson:"extension"`
+	HashMD5        []byte `json:"hash_md5" bson:"hash_md5"`
+	HashSHA256     []byte `json:"hash_sha256" bson:"hash_sha256"`
 }
 
 // a new file context
 func NewFileCtx() *FileCtx {
 	return &FileCtx{
-		Height:    0,
-		Width:     0,
-		FileSize:  0,
-		URL:       "",
-		Extension: "",
+		ServerFileName: "",
+		Height:         0,
+		Width:          0,
+		FileSize:       0,
+		URL:            "",
+		Extension:      "",
+		HashMD5:        []byte{},
+		HashSHA256:     []byte{},
 	}
 }
 
@@ -171,4 +234,30 @@ func ParseFormFileDetails(rq *http.Request) *FileUploadDetails {
 	}
 
 	return details
+}
+
+func NewFileName() (string, error) {
+	return gonanoid.Generate(FILE_NAME_CHAR_SET, FILE_NAME_LENGTH)
+}
+
+func UploadFile(file *os.File, servername string) (*s3manager.UploadOutput, error) {
+	s := session.Must(session.NewSession(&aws.Config{
+		Endpoint: aws.String(aws_endpoint),
+		Region:   aws.String(aws_region),
+	}))
+
+	u := s3manager.NewUploader(s)
+	result, err := u.Upload(&s3manager.UploadInput{
+		Bucket: aws.String(aws_bucket),
+		Key:    aws.String(servername),
+		Body:   file,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("file uploaded to", result.Location)
+
+	return result, nil
 }
