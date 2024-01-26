@@ -356,7 +356,7 @@ func (s *Store) FindAccountFromSession(id string) (*Account, error) {
 
 // Find Asset Source with a hash collisions
 // - accepts a byte slice of the hash
-// - accepts a types.HashMethod of the hash method used
+// - accepts a HashMethod of the hash method used
 // - returns a pointer to the asset source
 // - returns an error if one occurs
 //
