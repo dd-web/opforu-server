@@ -368,7 +368,7 @@ func (s *Store) AssetHashCollision(hash []byte, method HashMethod) (*AssetSource
 
 	var result AssetSource
 
-	err := collection.FindOne(ctx, bson.D{{Key: "details.source.hash_md5", Value: hash}}).Decode(&result)
+	err := collection.FindOne(ctx, bson.D{{Key: "details.source.hash_" + method.String(), Value: hash}}).Decode(&result)
 	if err != nil {
 		return nil, err
 	}

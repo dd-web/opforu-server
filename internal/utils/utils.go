@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -77,4 +79,19 @@ func AssertEnvStr(v string) string {
 		log.Fatal("Invalid Environemtn Variable")
 	}
 	return v
+}
+
+// create and return a new aws config
+func NewS3Config() *aws.Config {
+	key := os.Getenv("DO_API_KEY")
+	secret := os.Getenv("DO_API_SECRET")
+	// endpoint := os.Getenv("DO_API_ENDPOINT")
+	// region := os.Getenv("DO_API_REGION")
+
+	return &aws.Config{
+		Credentials:      credentials.NewStaticCredentials(key, secret, ""),
+		Endpoint:         aws.String("nyc3.digitaloceanspaces.com"),
+		Region:           aws.String("nyc3"),
+		S3ForcePathStyle: aws.Bool(false),
+	}
 }

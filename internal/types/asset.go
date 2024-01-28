@@ -5,8 +5,10 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/dd-web/opforu-server/internal/utils"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
@@ -38,12 +41,20 @@ const (
 	AssetTypeVideo AssetType = "video"
 )
 
+func (at AssetType) String() string {
+	return string(at)
+}
+
 type HashMethod string
 
 const (
 	HashMethodMD5    HashMethod = "md5"
 	HashMethodSHA256 HashMethod = "sha256"
 )
+
+func (hm HashMethod) String() string {
+	return string(hm)
+}
 
 type AssetSourceDetails struct {
 	Avatar *FileCtx `json:"avatar" bson:"avatar"`
@@ -240,24 +251,65 @@ func NewFileName() (string, error) {
 	return gonanoid.Generate(FILE_NAME_CHAR_SET, FILE_NAME_LENGTH)
 }
 
-func UploadFile(file *os.File, servername string) (*s3manager.UploadOutput, error) {
-	s := session.Must(session.NewSession(&aws.Config{
-		Endpoint: aws.String(aws_endpoint),
-		Region:   aws.String(aws_region),
-	}))
+type UploadFileDetails struct {
+	AssetType   AssetType
+	TimeStamp   int64
+	Ext         string
+	URL         string
+	TempFileLoc string
+}
 
-	u := s3manager.NewUploader(s)
-	result, err := u.Upload(&s3manager.UploadInput{
-		Bucket: aws.String(aws_bucket),
-		Key:    aws.String(servername),
-		Body:   file,
+func UploadFileToSpaces(file multipart.File, fileHeader *multipart.FileHeader, fileKind AssetType) (*UploadFileDetails, error) {
+	tempFileDir := "./tmp/" + fileKind.String() + "s/"
+
+	err := os.MkdirAll(tempFileDir, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UnixNano()
+	fileExt := filepath.Ext(fileHeader.Filename)
+	tempLoc := fmt.Sprintf(tempFileDir+"%d%s", now, fileExt)
+
+	tf, err := os.Create(tempLoc)
+	if err != nil {
+		return nil, err
+	}
+	defer tf.Close()
+
+	_, err = io.Copy(tf, file)
+	if err != nil {
+		return nil, err
+	}
+
+	tempFile, err := os.Open(tempLoc)
+	if err != nil {
+		return nil, err
+	}
+	defer tempFile.Close()
+
+	sess := session.Must(session.NewSession(utils.NewS3Config()))
+	uploader := s3manager.NewUploader(sess)
+
+	result, err := uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String("opforu"),
+		Key:    aws.String(fmt.Sprintf("images/%d%s", now, fileExt)),
+		Body:   tempFile,
+		ACL:    aws.String("public-read"),
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("file uploaded to", result.Location)
+	fmt.Println("result?", result)
 
-	return result, nil
+	return &UploadFileDetails{
+		AssetType:   fileKind,
+		TimeStamp:   now,
+		Ext:         fileExt,
+		URL:         result.Location,
+		TempFileLoc: tempLoc,
+	}, nil
+
 }

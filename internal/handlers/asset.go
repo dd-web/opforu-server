@@ -2,11 +2,8 @@ package handlers
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"os"
-	"path/filepath"
-	"time"
 
 	"github.com/dd-web/opforu-server/internal/types"
 	"go.mongodb.org/mongo-driver/bson"
@@ -66,21 +63,13 @@ func (ah *AssetHandler) handleNewAsset(rc *types.RequestCtx) error {
 		}
 		defer file.Close()
 
-		err = os.MkdirAll("./tmp/images", os.ModePerm)
+		details, err := types.UploadFileToSpaces(file, fileHeader, types.AssetTypeImage)
 		if err != nil {
 			return ResolveResponseErr(rc, types.ErrorUnexpected())
 		}
 
-		dst, err := os.Create(fmt.Sprintf("./tmp/images/%d%s", time.Now().UnixNano(), filepath.Ext(fileHeader.Filename)))
-		if err != nil {
-			return ResolveResponseErr(rc, types.ErrorUnexpected())
-		}
-		defer dst.Close()
-
-		_, err = io.Copy(dst, file)
-		if err != nil {
-			return ResolveResponseErr(rc, types.ErrorUnexpected())
-		}
+		fmt.Println("details", details)
+		_ = os.Remove(details.TempFileLoc)
 
 	case types.AssetTypeVideo:
 		fmt.Println("video")
