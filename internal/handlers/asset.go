@@ -1,12 +1,17 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/dd-web/opforu-server/internal/builder"
 	"github.com/dd-web/opforu-server/internal/types"
+	"github.com/dd-web/opforu-server/internal/utils"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type AssetHandler struct {
@@ -44,39 +49,144 @@ func (ah *AssetHandler) handleAssetList(rc *types.RequestCtx) error {
 // METHOD: POST
 // PATH: host.com/api/assets
 func (ah *AssetHandler) handleNewAsset(rc *types.RequestCtx) error {
-	fmt.Println("REQUEST:", rc.Request.Body)
-	fmt.Println("ContentLength", rc.Request.ContentLength)
+	if rc.UnresolvedAccount {
+		return ResolveResponseErr(rc, types.ErrorUnauthorized())
+	}
 
+	/*
+	 * Setup variable necessary for all steps, check that the file is valid
+	 * and setup temp file for upload
+	 */
+
+	file, fileHeader, err := rc.Request.FormFile("file")
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+	defer file.Close()
 	details := types.ParseFormFileDetails(rc.Request)
-	fmt.Println("details", details)
+
+	tmp, err := utils.NewTempAsset(file, fileHeader, details.AssetType.String())
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	fsize, _ := types.GetFileSize(tmp.Dir)
+	details.FileSize = uint32(fsize)
+
+	fmt.Println("FILE SIZE:", details.FileSize)
 
 	switch details.AssetType {
 	case types.AssetTypeImage:
-		fmt.Println("image")
 		if rc.Request.ContentLength > types.MAX_FILE_SIZE_IMAGE {
 			return ResolveResponseErr(rc, types.ErrorInvalid("file too large"))
 		}
-
-		file, fileHeader, err := rc.Request.FormFile("file")
-		if err != nil {
-			return ResolveResponseErr(rc, types.ErrorUnexpected())
-		}
-		defer file.Close()
-
-		details, err := types.UploadFileToSpaces(file, fileHeader, types.AssetTypeImage)
-		if err != nil {
-			return ResolveResponseErr(rc, types.ErrorUnexpected())
-		}
-
-		fmt.Println("details", details)
-		_ = os.Remove(details.TempFileLoc)
-
 	case types.AssetTypeVideo:
-		fmt.Println("video")
 		if rc.Request.ContentLength > types.MAX_FILE_SIZE_VIDEO {
 			return ResolveResponseErr(rc, types.ErrorInvalid("file too large"))
 		}
 	}
 
-	return HandleSendJSON(rc.Writer, http.StatusOK, bson.M{"message": "asset handler"}, rc)
+	/*
+	 * Collision detection
+	 * checks md5 and sha256 checksums of the file to see if it already exists in the database
+	 * we don't need to upload it again if it already exists, and the CDN can serve it.
+	 */
+	checksummd5, err := types.GetFileChecksumMD5(tmp.Dir)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	checksumsha256, err := types.GetFileChecksumSHA256(tmp.Dir)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	collisionQrStrMd5 := builder.QrStrFindHashCollision(checksummd5, "md5")
+	collisionQrStrSha256 := builder.QrStrFindHashCollision(checksumsha256, "sha256")
+
+	collided, err := ah.rh.Store.AssetHashCollisionResolver(collisionQrStrMd5, collisionQrStrSha256)
+	if err != nil {
+		fmt.Println("error resolving hash collision, probably not a problem tho", err)
+	}
+
+	/*
+	 * If a collision is detected then we can send back the id of the existing asset
+	 * if not then we should make a new asset source here and send the id of that back
+	 *
+	 * Asset's aren't made until after the user fully submits the new thread/post/whatever
+	 * so we don't need to worry about that here
+	 */
+
+	if collided != nil {
+		fmt.Println("Asset Collision Occurred:", collided)
+		rc.AddToResponseList("source_id", collided.ID)
+		rc.AddToResponseList("local_id", details.LocalID)
+
+		uploaderExistsInList := false
+		for _, v := range collided.Uploaders {
+			if v == rc.AccountCtx.Account.ID {
+				uploaderExistsInList = true
+				break
+			}
+		}
+
+		if !uploaderExistsInList {
+
+			collided.Uploaders = append(collided.Uploaders, rc.AccountCtx.Account.ID)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			collection := ah.rh.Store.DB.Collection("asset_sources")
+			opts := options.Update().SetUpsert(false)
+
+			updateQry := builder.BsonOperator("$set", "uploaders", collided.Uploaders)
+
+			result, err := collection.UpdateByID(ctx, collided.ID, updateQry, opts)
+			if err != nil {
+				fmt.Println("error updating asset source", err)
+			}
+
+			fmt.Println("Update Uploaders result:", result)
+		}
+
+	} else {
+		fmt.Println("No Collision Detected, upload file and make new asset source")
+		result, err := types.UploadFileToSpaces(tmp)
+		if err != nil {
+			return ResolveResponseErr(rc, types.ErrorUnexpected())
+		}
+
+		assetSrc := types.NewSourceAsset()
+		assetSrc.Uploaders = append(assetSrc.Uploaders, rc.AccountCtx.Account.ID)
+		assetSrc.AssetType = details.AssetType
+
+		assetSrc.Details.Source.ServerFileName = fmt.Sprintf("%d", tmp.TimeStamp)
+		assetSrc.Details.Source.Height = uint16(details.Height)
+		assetSrc.Details.Source.Width = uint16(details.Width)
+		assetSrc.Details.Source.FileSize = uint32(details.FileSize)
+		assetSrc.Details.Source.URL = result
+		assetSrc.Details.Source.Extension = tmp.Ext
+		assetSrc.Details.Source.HashMD5 = checksummd5
+		assetSrc.Details.Source.HashSHA256 = checksumsha256
+
+		// for the time being we're just going to use source files for everything
+		// and implement something to create avatars later.
+		// we should pretend as if we already have them though. to make updating easier.
+		assetSrc.Details.Avatar.ServerFileName = fmt.Sprintf("a-%d", tmp.TimeStamp)
+
+		err = rc.Store.SaveNewSingle(assetSrc, "asset_sources")
+		if err != nil {
+			fmt.Println("error saving new asset source", err)
+			return ResolveResponseErr(rc, types.ErrorUnexpected())
+		}
+
+		rc.AddToResponseList("source_id", assetSrc.ID)
+		rc.AddToResponseList("local_id", details.LocalID)
+	}
+
+	// finally, remove the temp file
+	_ = os.Remove(tmp.Dir)
+
+	return ResolveResponse(rc)
+	// return HandleSendJSON(rc.Writer, http.StatusOK, bson.M{"message": "asset handler"}, rc)
 }

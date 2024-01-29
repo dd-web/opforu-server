@@ -34,31 +34,33 @@ const (
 
 // holds all of the resolved/parsed request details and info so that handlers can be more simple and focused.
 type RequestCtx struct {
-	Request      *http.Request       // request
-	Writer       http.ResponseWriter // writer
-	Query        *QueryCtx           // the parsed query context (or nil if irrelevant/not yet parsed)
-	Resource     APIResource         // this is the main subroute of the API, the first major path after root.
-	Pagination   *PageCtx            `json:"pages"`   // pagination information
-	Records      []bson.M            `json:"records"` // resource(s) we intend to return to the client
-	Store        *Store
-	AccountCtx   *AccountCtx
-	ResponseList []bson.M
-	ResponseData bson.M
+	Request           *http.Request       // request
+	Writer            http.ResponseWriter // writer
+	Query             *QueryCtx           // the parsed query context (or nil if irrelevant/not yet parsed)
+	Resource          APIResource         // this is the main subroute of the API, the first major path after root.
+	Pagination        *PageCtx            `json:"pages"`   // pagination information
+	Records           []bson.M            `json:"records"` // resource(s) we intend to return to the client
+	Store             *Store
+	AccountCtx        *AccountCtx
+	UnresolvedAccount bool
+	ResponseList      []bson.M
+	ResponseData      bson.M
 }
 
 // creates a new request context - parses and resolves request details into the context
 // in order for handlers to be more simple and focused
 func NewRequestCtx(w http.ResponseWriter, r *http.Request) *RequestCtx {
 	return (&RequestCtx{
-		Request:      r,
-		Writer:       w,
-		Query:        NewQueryCtx(),
-		Resource:     APIResource(strings.Split(r.URL.Path, "/")[2]),
-		Pagination:   NewPageCtx(),
-		Records:      []bson.M{},
-		ResponseList: []bson.M{},
-		ResponseData: bson.M{},
-		AccountCtx:   NewAccountCtx(),
+		Request:           r,
+		Writer:            w,
+		Query:             NewQueryCtx(),
+		Resource:          APIResource(strings.Split(r.URL.Path, "/")[2]),
+		Pagination:        NewPageCtx(),
+		Records:           []bson.M{},
+		ResponseList:      []bson.M{},
+		ResponseData:      bson.M{},
+		AccountCtx:        NewAccountCtx(),
+		UnresolvedAccount: false,
 	}).Resolve()
 }
 
@@ -142,6 +144,11 @@ func (rc *RequestCtx) ResolveAccountCtx() {
 		fmt.Println("Error finding account", err)
 		// delete the session and cookie
 		return
+	}
+
+	_, err = primitive.ObjectIDFromHex(account.ID.Hex())
+	if err != nil {
+		rc.UnresolvedAccount = true
 	}
 
 	rc.AccountCtx.Account = account

@@ -144,6 +144,17 @@ func (s *Store) SaveNewSingle(document any, col string) error {
 	return nil
 }
 
+// func (s *Store) UpdateSingle(id primitive.ObjectID, col string, updateQuery bson.D) error {
+// 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// 	defer cancel()
+
+// 	collection := s.DB.Collection(col)
+// 	opts := options.Update().SetUpsert(false)
+
+// 	result, err := collection.UpdateByID(ctx, id, updateQuery)
+
+// }
+
 // Delete a single Document
 // - accepts a primitive.ObjectID of the document to be deleted
 // - accepts a string of the collection name
@@ -354,24 +365,51 @@ func (s *Store) FindAccountFromSession(id string) (*Account, error) {
 	return account, nil
 }
 
-// Find Asset Source with a hash collisions
-// - accepts a byte slice of the hash
-// - accepts a HashMethod of the hash method used
-// - returns a pointer to the asset source
-// - returns an error if one occurs
-//
-// still lots to do here. just getting something working for now.
-func (s *Store) AssetHashCollision(hash []byte, method HashMethod) (*AssetSource, error) {
+// runs a list of queries provided (hash collision query strings from builder)
+// returns an AssetSource of the first matching hash collision
+func (s *Store) AssetHashCollisionResolver(queries ...primitive.D) (*AssetSource, error) {
+	var found *AssetSource
+	matched := false
+
+	for _, query := range queries {
+		result, err := s.assetColliderQuery(query)
+		if err != nil {
+			fmt.Println("error wasn't nil on a collision check:", err)
+			continue
+		}
+		if result != nil {
+			found = result
+			matched = true
+			break
+		}
+	}
+
+	if !matched {
+		return nil, nil
+	}
+
+	return found, nil
+}
+
+// single query runner for the resolver
+func (s *Store) assetColliderQuery(query primitive.D) (*AssetSource, error) {
 	collection := s.DB.Collection("asset_sources")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	var result AssetSource
+	result := &AssetSource{
+		ID: primitive.NilObjectID,
+	}
 
-	err := collection.FindOne(ctx, bson.D{{Key: "details.source.hash_" + method.String(), Value: hash}}).Decode(&result)
+	err := collection.FindOne(ctx, query).Decode(&result)
 	if err != nil {
 		return nil, err
 	}
 
-	return &result, nil
+	if result.ID == primitive.NilObjectID {
+		return nil, nil
+	}
+
+	fmt.Println("Matching Hash Found (store collision check):", result)
+	return result, nil
 }

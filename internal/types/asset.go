@@ -3,12 +3,11 @@ package types
 import (
 	"crypto/md5"
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 
@@ -27,10 +26,6 @@ const (
 
 	FILE_NAME_CHAR_SET = "abcdefghijkmnpqrstuvwxyz123456789-_"
 	FILE_NAME_LENGTH   = 32
-
-	aws_endpoint = "nyc3.digitaloceanspaces.com"
-	aws_region   = "nyc3"
-	aws_bucket   = "opforu"
 )
 
 // available asset types that can be uploaded - open for expansion
@@ -104,28 +99,13 @@ func NewSourceAsset() *AssetSource {
 	ts := time.Now().UTC()
 	as := &AssetSource{
 		ID: primitive.NewObjectID(),
-
 		Details: &AssetSourceDetails{
 			Avatar: NewFileCtx(),
 			Source: NewFileCtx(),
 		},
-
 		Uploaders: []primitive.ObjectID{},
 		CreatedAt: &ts,
 		UpdatedAt: &ts,
-	}
-
-	var aname, sname string = "", ""
-
-	aname, _ = NewFileName()
-	sname, _ = NewFileName()
-
-	if aname != "" {
-		as.Details.Avatar.ServerFileName = aname
-	}
-
-	if sname != "" {
-		as.Details.Source.ServerFileName = sname
 	}
 
 	return as
@@ -148,13 +128,13 @@ func NewAsset(src primitive.ObjectID, acct primitive.ObjectID) *Asset {
 // Details about the file, since files can have avatar and source files this is abstracted out. Both may not need all of these.
 type FileCtx struct {
 	ServerFileName string `json:"server_file_name" bson:"server_file_name"`
-	Height         uint64 `json:"height" bson:"height"`
-	Width          uint64 `json:"width" bson:"width"`
-	FileSize       uint64 `json:"file_size" bson:"file_size"`
+	Height         uint16 `json:"height" bson:"height"`
+	Width          uint16 `json:"width" bson:"width"`
+	FileSize       uint32 `json:"file_size" bson:"file_size"`
 	URL            string `json:"url" bson:"url"`
 	Extension      string `json:"extension" bson:"extension"`
-	HashMD5        []byte `json:"hash_md5" bson:"hash_md5"`
-	HashSHA256     []byte `json:"hash_sha256" bson:"hash_sha256"`
+	HashMD5        string `json:"hash_md5" bson:"hash_md5"`
+	HashSHA256     string `json:"hash_sha256" bson:"hash_sha256"`
 }
 
 // a new file context
@@ -166,16 +146,16 @@ func NewFileCtx() *FileCtx {
 		FileSize:       0,
 		URL:            "",
 		Extension:      "",
-		HashMD5:        []byte{},
-		HashSHA256:     []byte{},
+		HashMD5:        "",
+		HashSHA256:     "",
 	}
 }
 
 // returns an md5 checksum of the file located at filename
-func GetFileChecksumMD5(filename string) ([]byte, error) {
+func GetFileChecksumMD5(filename string) (string, error) {
 	file, err := os.Open(filename)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer file.Close()
 
@@ -183,28 +163,27 @@ func GetFileChecksumMD5(filename string) ([]byte, error) {
 
 	_, err = io.Copy(hash, file)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return hash.Sum(nil), nil
-
+	return base64.URLEncoding.EncodeToString(hash.Sum(nil)), nil
 }
 
 // returns an sha256 checksum of the file located at filename
-func GetFileChecksumSHA256(filename string) ([]byte, error) {
+func GetFileChecksumSHA256(filename string) (string, error) {
 	file, err := os.Open(filename)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer file.Close()
 
 	hash := sha256.New()
 	_, err = io.Copy(hash, file)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return hash.Sum(nil), nil
+	return base64.URLEncoding.EncodeToString(hash.Sum(nil)), nil
 }
 
 // returns the size of the file located at filename
@@ -218,22 +197,20 @@ func GetFileSize(filename string) (int64, error) {
 }
 
 type FileUploadDetails struct {
-	AssetType   AssetType
-	LocalID     string
-	Description string
-	FileName    string
-	Height      int
-	Width       int
+	AssetType AssetType
+	LocalID   string
+	FileSize  uint32
+	Height    int
+	Width     int
 }
 
 func ParseFormFileDetails(rq *http.Request) *FileUploadDetails {
 	details := &FileUploadDetails{
-		AssetType:   AssetType(rq.FormValue("type")),
-		LocalID:     rq.FormValue("local_id"),
-		Description: rq.FormValue("description"),
-		FileName:    rq.FormValue("name"),
-		Height:      0,
-		Width:       0,
+		AssetType: AssetType(rq.FormValue("type")),
+		LocalID:   rq.FormValue("local_id"),
+		Height:    0,
+		Width:     0,
+		FileSize:  0,
 	}
 
 	if height, err := strconv.Atoi(rq.FormValue("height")); err == nil {
@@ -251,40 +228,11 @@ func NewFileName() (string, error) {
 	return gonanoid.Generate(FILE_NAME_CHAR_SET, FILE_NAME_LENGTH)
 }
 
-type UploadFileDetails struct {
-	AssetType   AssetType
-	TimeStamp   int64
-	Ext         string
-	URL         string
-	TempFileLoc string
-}
-
-func UploadFileToSpaces(file multipart.File, fileHeader *multipart.FileHeader, fileKind AssetType) (*UploadFileDetails, error) {
-	tempFileDir := "./tmp/" + fileKind.String() + "s/"
-
-	err := os.MkdirAll(tempFileDir, os.ModePerm)
+// upload temp file to spaces and return the url
+func UploadFileToSpaces(tasset *utils.TempAsset) (string, error) {
+	tempFile, err := os.Open(tasset.Dir)
 	if err != nil {
-		return nil, err
-	}
-
-	now := time.Now().UnixNano()
-	fileExt := filepath.Ext(fileHeader.Filename)
-	tempLoc := fmt.Sprintf(tempFileDir+"%d%s", now, fileExt)
-
-	tf, err := os.Create(tempLoc)
-	if err != nil {
-		return nil, err
-	}
-	defer tf.Close()
-
-	_, err = io.Copy(tf, file)
-	if err != nil {
-		return nil, err
-	}
-
-	tempFile, err := os.Open(tempLoc)
-	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer tempFile.Close()
 
@@ -293,23 +241,14 @@ func UploadFileToSpaces(file multipart.File, fileHeader *multipart.FileHeader, f
 
 	result, err := uploader.Upload(&s3manager.UploadInput{
 		Bucket: aws.String("opforu"),
-		Key:    aws.String(fmt.Sprintf("images/%d%s", now, fileExt)),
+		Key:    aws.String(fmt.Sprintf("%ss/%d%s", tasset.AssetType, tasset.TimeStamp, tasset.Ext)),
 		Body:   tempFile,
 		ACL:    aws.String("public-read"),
 	})
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	fmt.Println("result?", result)
-
-	return &UploadFileDetails{
-		AssetType:   fileKind,
-		TimeStamp:   now,
-		Ext:         fileExt,
-		URL:         result.Location,
-		TempFileLoc: tempLoc,
-	}, nil
-
+	return result.Location, nil
 }

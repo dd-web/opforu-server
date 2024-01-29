@@ -1,6 +1,10 @@
 package builder
 
-import "go.mongodb.org/mongo-driver/bson"
+import (
+	"fmt"
+
+	"go.mongodb.org/mongo-driver/bson"
+)
 
 var (
 	ASSET_SRC_PUBLIC_INCLUDE_FIELDS = []string{"details", "asset_type"}
@@ -26,4 +30,15 @@ func QrStrLookupAssets() bson.D {
 		BsonOperWithArray("$unset", []interface{}{"_id"}),
 	}
 	return BsonLookup("assets", "assets", "_id", "assets", bson.D{}, pipe)
+}
+
+// Checksum hash collision query - checks source and avatar for given hash using specified method
+func QrStrFindHashCollision(hash string, method string) bson.D {
+	return BsonOperWithArray(
+		"$or",
+		[]interface{}{
+			BsonD(fmt.Sprintf("details.avatar.hash_%s", method), hash),
+			BsonD(fmt.Sprintf("details.source.hash_%s", method), hash),
+		},
+	)
 }

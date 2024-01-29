@@ -7,12 +7,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-var (
-	// permissions
-	PUBLIC_ACCOUNT_FIELDS   = []string{"username", "role", "status", "created_at", "updated_at", "deleted_at"}
-	PERSONAL_ACCOUNT_FIELDS = []string{"email", "_id"}
-)
-
 type Account struct {
 	ID       primitive.ObjectID `bson:"_id,omitempty" json:"_id"`
 	Username string             `bson:"username,omitempty" json:"username"`

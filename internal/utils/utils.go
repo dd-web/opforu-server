@@ -2,8 +2,12 @@ package utils
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"mime/multipart"
 	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -94,4 +98,43 @@ func NewS3Config() *aws.Config {
 		Region:           aws.String("nyc3"),
 		S3ForcePathStyle: aws.Bool(false),
 	}
+}
+
+type TempAsset struct {
+	TimeStamp int64
+	AssetType string
+	Ext       string
+	Dir       string
+}
+
+func NewTempAsset(file multipart.File, header *multipart.FileHeader, kind string) (*TempAsset, error) {
+	tempdir := "./tmp/" + kind + "s/"
+
+	err := os.MkdirAll(tempdir, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UnixNano()
+	ext := filepath.Ext(header.Filename)
+	tempf := fmt.Sprintf(tempdir+"%d%s", now, ext)
+
+	tempFile, err := os.Create(tempf)
+	if err != nil {
+		return nil, err
+	}
+	defer tempFile.Close()
+
+	_, err = io.Copy(tempFile, file)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TempAsset{
+		TimeStamp: now,
+		AssetType: kind,
+		Ext:       ext,
+		Dir:       tempf,
+	}, nil
+
 }
