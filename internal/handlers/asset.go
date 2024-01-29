@@ -73,8 +73,6 @@ func (ah *AssetHandler) handleNewAsset(rc *types.RequestCtx) error {
 	fsize, _ := types.GetFileSize(tmp.Dir)
 	details.FileSize = uint32(fsize)
 
-	fmt.Println("FILE SIZE:", details.FileSize)
-
 	switch details.AssetType {
 	case types.AssetTypeImage:
 		if rc.Request.ContentLength > types.MAX_FILE_SIZE_IMAGE {
@@ -91,6 +89,7 @@ func (ah *AssetHandler) handleNewAsset(rc *types.RequestCtx) error {
 	 * checks md5 and sha256 checksums of the file to see if it already exists in the database
 	 * we don't need to upload it again if it already exists, and the CDN can serve it.
 	 */
+
 	checksummd5, err := types.GetFileChecksumMD5(tmp.Dir)
 	if err != nil {
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
@@ -118,10 +117,10 @@ func (ah *AssetHandler) handleNewAsset(rc *types.RequestCtx) error {
 	 */
 
 	if collided != nil {
-		fmt.Println("Asset Collision Occurred:", collided)
 		rc.AddToResponseList("source_id", collided.ID)
 		rc.AddToResponseList("local_id", details.LocalID)
 
+		// add the uploader to list of uploaders if they aren't already in it
 		uploaderExistsInList := false
 		for _, v := range collided.Uploaders {
 			if v == rc.AccountCtx.Account.ID {
@@ -131,7 +130,6 @@ func (ah *AssetHandler) handleNewAsset(rc *types.RequestCtx) error {
 		}
 
 		if !uploaderExistsInList {
-
 			collided.Uploaders = append(collided.Uploaders, rc.AccountCtx.Account.ID)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
@@ -141,16 +139,13 @@ func (ah *AssetHandler) handleNewAsset(rc *types.RequestCtx) error {
 
 			updateQry := builder.BsonOperator("$set", "uploaders", collided.Uploaders)
 
-			result, err := collection.UpdateByID(ctx, collided.ID, updateQry, opts)
+			_, err := collection.UpdateByID(ctx, collided.ID, updateQry, opts)
 			if err != nil {
 				fmt.Println("error updating asset source", err)
 			}
-
-			fmt.Println("Update Uploaders result:", result)
 		}
 
 	} else {
-		fmt.Println("No Collision Detected, upload file and make new asset source")
 		result, err := types.UploadFileToSpaces(tmp)
 		if err != nil {
 			return ResolveResponseErr(rc, types.ErrorUnexpected())
@@ -184,9 +179,8 @@ func (ah *AssetHandler) handleNewAsset(rc *types.RequestCtx) error {
 		rc.AddToResponseList("local_id", details.LocalID)
 	}
 
-	// finally, remove the temp file
+	// cleanup
 	_ = os.Remove(tmp.Dir)
 
 	return ResolveResponse(rc)
-	// return HandleSendJSON(rc.Writer, http.StatusOK, bson.M{"message": "asset handler"}, rc)
 }
