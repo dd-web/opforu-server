@@ -1,6 +1,7 @@
 package types
 
 import (
+	"math/rand"
 	"time"
 
 	gonanoid "github.com/matoous/go-nanoid/v2"
@@ -15,6 +16,10 @@ var (
 	// permissions
 	PUBLIC_IDENTITY_FIELDS   = []string{"name", "style", "role", "status", "created_at", "updated_at", "deleted_at"}
 	PERSONAL_IDENTITY_FIELDS = []string{"_id", "account"}
+
+	// styles
+	IDENTITY_STYLE_PREFIXES = []string{"filled", "ghost", "soft", "glass"}
+	IDENTITY_STYLE_SUFFIXES = []string{"primary", "secondary", "tertiary", "success", "warning", "error", "surface"}
 )
 
 type Identity struct {
@@ -53,6 +58,7 @@ func NewIdentity() *Identity {
 		ID:        primitive.NewObjectID(),
 		Role:      ThreadRoleUser,
 		Status:    IdentityStatusActive,
+		Style:     NewIdentityStyle(),
 		Name:      name,
 		CreatedAt: &ts,
 		UpdatedAt: &ts,
@@ -70,4 +76,17 @@ func (i *Identity) CLFormat() bson.M {
 		"created_at": i.CreatedAt,
 		"updated_at": i.UpdatedAt,
 	}
+}
+
+func randPrefix() string {
+	return IDENTITY_STYLE_PREFIXES[rand.Intn(len(IDENTITY_STYLE_PREFIXES))]
+	// return rand.Intn(max-min) + min
+}
+
+func randSuffix() string {
+	return IDENTITY_STYLE_SUFFIXES[rand.Intn(len(IDENTITY_STYLE_SUFFIXES))]
+}
+
+func NewIdentityStyle() string {
+	return "variant-" + randPrefix() + "-" + randSuffix()
 }

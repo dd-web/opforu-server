@@ -30,7 +30,9 @@ type Thread struct {
 	Body  string `bson:"body" json:"body"`
 	Slug  string `bson:"slug" json:"slug"`
 
-	Board   primitive.ObjectID `bson:"board" json:"board"`
+	Board primitive.ObjectID `bson:"board" json:"board"`
+
+	// Creator is the Identity made for the creator of the thread, not the account id
 	Creator primitive.ObjectID `bson:"creator" json:"creator"`
 
 	Posts []primitive.ObjectID `bson:"posts" json:"posts"`
@@ -51,7 +53,11 @@ func NewThread() *Thread {
 	return &Thread{
 		ID:        primitive.NewObjectID(),
 		Status:    ThreadStatusOpen,
+		Title:     "",
+		Body:      "",
 		Slug:      NewThreadSlug(),
+		Board:     primitive.NilObjectID,
+		Creator:   primitive.NilObjectID,
 		Posts:     []primitive.ObjectID{},
 		Mods:      []primitive.ObjectID{},
 		Assets:    []primitive.ObjectID{},

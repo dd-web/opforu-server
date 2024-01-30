@@ -122,6 +122,8 @@ func (rc *RequestCtx) ResolveAccountCtx() {
 	// fmt.Println("Resolved Session ID:", sessionid)
 
 	if sessionid == "" {
+		fmt.Println("Session ID is Empty!")
+		rc.UnresolvedAccount = true
 		return
 	}
 

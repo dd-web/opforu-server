@@ -115,13 +115,14 @@ func NewSourceAsset() *AssetSource {
 func NewAsset(src primitive.ObjectID, acct primitive.ObjectID) *Asset {
 	ts := time.Now().UTC()
 	return &Asset{
-		ID:        primitive.NewObjectID(),
-		AccountID: acct,
-		SourceID:  src,
-		Tags:      []string{},
-		FileName:  "",
-		CreatedAt: &ts,
-		UpdatedAt: &ts,
+		ID:          primitive.NewObjectID(),
+		AccountID:   acct,
+		SourceID:    src,
+		Tags:        []string{},
+		FileName:    "",
+		Description: "",
+		CreatedAt:   &ts,
+		UpdatedAt:   &ts,
 	}
 }
 

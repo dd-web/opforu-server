@@ -124,37 +124,82 @@ func (bh *BoardHandler) handleBoardShort(rc *types.RequestCtx) error {
 // METHOD: POST
 // PATH: host.com/api/boards/{short}
 func (bh *BoardHandler) handleNewThread(rc *types.RequestCtx) error {
-	vars := mux.Vars(rc.Request)
+	if rc.UnresolvedAccount {
+		return ResolveResponseErr(rc, types.ErrorUnauthorized())
+	}
 
+	/*
+	 * Setup variables & parse request for all steps
+	 */
+	vars := mux.Vars(rc.Request)
 	board, err := rc.Store.FindBoardByShort(vars["short"])
 	if err != nil {
 		return err
 	}
 
+	details := types.NewRUMThread()
+
 	body, err := io.ReadAll(rc.Request.Body)
 	if err != nil {
+		fmt.Println("Error reading body")
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
 	}
 
-	var thread_parsed types.Thread // copy values from parsed to actual thread - to prevent client fuckery
-	var thread = types.NewThread()
-
-	err = json.Unmarshal(body, &thread)
+	err = json.Unmarshal(body, &details)
 	if err != nil {
+		fmt.Println("Error Unmarshalling body", err)
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
 	}
 
-	thread.Title = thread_parsed.Title
-	thread.Body = thread_parsed.Body // needs parsing
+	/*
+	 * Create dependency objects for thread, create thread, validate thread
+	 * then save all dependencies and lastly the thread
+	 */
+	newThreadAssets := []*types.Asset{}
+	newThreadAssetInterfaces := []interface{}{}
+
+	for _, v := range details.Assets {
+		a := types.NewAsset(v.SourceID, rc.AccountCtx.Account.ID)
+		a.FileName = v.FileName
+		a.Description = v.Description
+		a.Tags = v.Tags
+		newThreadAssets = append(newThreadAssets, a)
+	}
+
+	newIdentity := types.NewIdentity()
+	newIdentity.Account = rc.AccountCtx.Account.ID
+	newIdentity.Role = types.ThreadRoleCreator
+
+	thread := types.NewThread()
+
+	thread.Title = details.Title
+	thread.Body = details.Content
 	thread.Board = board.ID
-	thread.Creator = rc.AccountCtx.Account.ID
-	thread.Mods = append(thread.Mods, rc.AccountCtx.Account.ID)
-	thread.Tags = thread_parsed.Tags
+	thread.Creator = newIdentity.ID
+	thread.Mods = append(thread.Mods, newIdentity.ID)
 
-	err = thread.Validate()
-	if err != nil {
-		return ResolveResponseErr(rc, types.ErrorInvalid(err.Error()))
+	for _, v := range newThreadAssets {
+		thread.Assets = append(thread.Assets, v.ID)
+		newThreadAssetInterfaces = append(newThreadAssetInterfaces, v)
 	}
 
+	err = rc.Store.SaveNewMulti(newThreadAssetInterfaces, "assets")
+	if err != nil {
+		fmt.Println("Error saving new assets", err)
+	}
+
+	err = rc.Store.SaveNewSingle(newIdentity, "identities")
+	if err != nil {
+		fmt.Println("Error saving new identity", err)
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	err = rc.Store.SaveNewSingle(thread, "threads")
+	if err != nil {
+		fmt.Println("Error saving new thread", err)
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	rc.AddToResponseList("thread_id", thread.Slug)
 	return ResolveResponse(rc)
 }
