@@ -119,8 +119,6 @@ func (rc *RequestCtx) ResolveAccountCtx() {
 		}
 	}
 
-	// fmt.Println("Resolved Session ID:", sessionid)
-
 	if sessionid == "" {
 		fmt.Println("Session ID is Empty!")
 		rc.UnresolvedAccount = true
@@ -130,11 +128,13 @@ func (rc *RequestCtx) ResolveAccountCtx() {
 	session, err := rc.Store.FindSession(sessionid)
 	if err != nil {
 		fmt.Println("Error finding session", err)
+		rc.UnresolvedAccount = true
 		return
 	}
 
 	if session.IsExpired() {
 		fmt.Println("Session Expired!")
+		rc.UnresolvedAccount = true
 		rc.AccountCtx.ExpiredSession = true
 		return
 	}
@@ -144,6 +144,7 @@ func (rc *RequestCtx) ResolveAccountCtx() {
 	account, err := rc.Store.FindAccountFromSession(session.SessionID)
 	if err != nil {
 		fmt.Println("Error finding account", err)
+		rc.UnresolvedAccount = true
 		// delete the session and cookie
 		return
 	}

@@ -3,9 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
-	"net/http"
 	"time"
 
 	"github.com/dd-web/opforu-server/internal/builder"
@@ -47,8 +45,7 @@ func (bh *BoardHandler) handleBoardList(rc *types.RequestCtx) error {
 
 	cursor, err := col.Find(ctx, bson.M{})
 	if err != nil {
-		fmt.Println("Error decoding board", err)
-		return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
 	}
 
 	defer func() {
@@ -61,8 +58,7 @@ func (bh *BoardHandler) handleBoardList(rc *types.RequestCtx) error {
 		var board types.Board
 		err := cursor.Decode(&board)
 		if err != nil {
-			fmt.Println("Error decoding board", err)
-			return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
+			return ResolveResponseErr(rc, types.ErrorUnexpected())
 		}
 		boards = append(boards, board)
 	}
@@ -128,9 +124,7 @@ func (bh *BoardHandler) handleNewThread(rc *types.RequestCtx) error {
 		return ResolveResponseErr(rc, types.ErrorUnauthorized())
 	}
 
-	/*
-	 * Setup variables & parse request for all steps
-	 */
+	// invoke necessary data and dependencies
 	vars := mux.Vars(rc.Request)
 	board, err := rc.Store.FindBoardByShort(vars["short"])
 	if err != nil {
@@ -141,20 +135,15 @@ func (bh *BoardHandler) handleNewThread(rc *types.RequestCtx) error {
 
 	body, err := io.ReadAll(rc.Request.Body)
 	if err != nil {
-		fmt.Println("Error reading body")
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
 	}
 
 	err = json.Unmarshal(body, &details)
 	if err != nil {
-		fmt.Println("Error Unmarshalling body", err)
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
 	}
 
-	/*
-	 * Create dependency objects for thread, create thread, validate thread
-	 * then save all dependencies and lastly the thread
-	 */
+	// dependency injection
 	newThreadAssets := []*types.Asset{}
 	newThreadAssetInterfaces := []interface{}{}
 
@@ -185,18 +174,16 @@ func (bh *BoardHandler) handleNewThread(rc *types.RequestCtx) error {
 
 	err = rc.Store.SaveNewMulti(newThreadAssetInterfaces, "assets")
 	if err != nil {
-		fmt.Println("Error saving new assets", err)
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
 	}
 
 	err = rc.Store.SaveNewSingle(newIdentity, "identities")
 	if err != nil {
-		fmt.Println("Error saving new identity", err)
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
 	}
 
 	err = rc.Store.SaveNewSingle(thread, "threads")
 	if err != nil {
-		fmt.Println("Error saving new thread", err)
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
 	}
 

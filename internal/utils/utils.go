@@ -89,13 +89,13 @@ func AssertEnvStr(v string) string {
 func NewS3Config() *aws.Config {
 	key := os.Getenv("DO_API_KEY")
 	secret := os.Getenv("DO_API_SECRET")
-	// endpoint := os.Getenv("DO_API_ENDPOINT")
-	// region := os.Getenv("DO_API_REGION")
+	endpoint := os.Getenv("DO_API_ENDPOINT")
+	region := os.Getenv("DO_API_REGION")
 
 	return &aws.Config{
 		Credentials:      credentials.NewStaticCredentials(key, secret, ""),
-		Endpoint:         aws.String("nyc3.digitaloceanspaces.com"),
-		Region:           aws.String("nyc3"),
+		Endpoint:         aws.String(endpoint),
+		Region:           aws.String(region),
 		S3ForcePathStyle: aws.Bool(false),
 	}
 }
