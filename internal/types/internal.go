@@ -239,7 +239,7 @@ type QueryCtx struct {
 // creates a new query context with default values
 func NewQueryCtx() *QueryCtx {
 	return &QueryCtx{
-		Sort:                 "title",
+		Sort:                 "updated_at",
 		Order:                -1,
 		Limit:                10,
 		Skip:                 0,

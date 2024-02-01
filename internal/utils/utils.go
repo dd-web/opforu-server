@@ -15,14 +15,14 @@ import (
 )
 
 var envKeys = []string{
-	"env", "ENV", "environment", "ENVIRONMENT", "node_env", "NODE_ENV",
+	"env", "ENV", "environment", "ENVIRONMENT", "node_env", "NODE_ENV", "app_env", "APP_ENV",
 }
 
 var envVals = []string{
 	"prod", "production", "PROD", "PRODUCTION",
 }
 
-// cross reference env keys and values to determine if we are in production
+// are we in a production environment
 func IsProdEnv() bool {
 	for _, k := range envKeys {
 		val := os.Getenv(k)
@@ -36,6 +36,11 @@ func IsProdEnv() bool {
 		}
 	}
 	return false
+}
+
+// are we in a development environment
+func IsDevEnv() bool {
+	return !IsProdEnv()
 }
 
 // ensures the passed string has a value and is not empty

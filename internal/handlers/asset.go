@@ -70,6 +70,10 @@ func (ah *AssetHandler) handleNewAsset(rc *types.RequestCtx) error {
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
 	}
 
+	defer func() {
+		_ = os.Remove(tmp.Dir)
+	}()
+
 	fsize, _ := types.GetFileSize(tmp.Dir)
 	details.FileSize = uint32(fsize)
 
@@ -120,7 +124,6 @@ func (ah *AssetHandler) handleNewAsset(rc *types.RequestCtx) error {
 		rc.AddToResponseList("source_id", collided.ID)
 		rc.AddToResponseList("local_id", details.LocalID)
 
-		// add the uploader to list of uploaders if they aren't already in it
 		uploaderExistsInList := false
 		for _, v := range collided.Uploaders {
 			if v == rc.AccountCtx.Account.ID {
@@ -171,7 +174,6 @@ func (ah *AssetHandler) handleNewAsset(rc *types.RequestCtx) error {
 
 		err = rc.Store.SaveNewSingle(assetSrc, "asset_sources")
 		if err != nil {
-			fmt.Println("error saving new asset source", err)
 			return ResolveResponseErr(rc, types.ErrorUnexpected())
 		}
 
@@ -180,7 +182,7 @@ func (ah *AssetHandler) handleNewAsset(rc *types.RequestCtx) error {
 	}
 
 	// cleanup
-	_ = os.Remove(tmp.Dir)
+	// _ = os.Remove(tmp.Dir)
 
 	return ResolveResponse(rc)
 }

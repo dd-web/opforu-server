@@ -13,20 +13,17 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// Server Cache
-// high level cache for extremely frequently used data
-// TODO: implement refreshes & invalidation
+// High level server cache for frequently used data to avoid network calls
+//
+// Boards are cached on server start, sessions and accounts are cached as they're accessed.
 type ServerCache struct {
-	Boards   map[string]*Board               // short -> Board
-	Sessions map[string]*Session             // session_id -> Session
-	Accounts map[primitive.ObjectID]*Account // _id -> Account
-
+	Boards    map[string]*Board               // short -> Board
+	Sessions  map[string]*Session             // session_id -> Session
+	Accounts  map[primitive.ObjectID]*Account // _id -> Account
 	StartedAt *time.Time
 	EndedAt   *time.Time
 }
 
-// New Server Cache
-// creates a new server cache with empty maps and the current time
 func NewServerCache() *ServerCache {
 	ts := time.Now().UTC()
 	return &ServerCache{
@@ -37,19 +34,22 @@ func NewServerCache() *ServerCache {
 	}
 }
 
+// Global data store initialized on server start
+//
+// Store is initialized on server start and is referenced in all handlers.
+// The RequestCtx for any particular handler will be updated with a reference
+// to the store after it's called.
+//
+// This is all to avoid circular dependencies while giving store access essentially everywhere.
 type Store struct {
-	Client *mongo.Client
-	DB     *mongo.Database
-	Name   string
-
-	Cache *ServerCache // high level cache for frequently used data
-
+	Name      string
+	Client    *mongo.Client
+	DB        *mongo.Database
+	Cache     *ServerCache
 	StartedAt *time.Time
 	EndedAt   *time.Time
 }
 
-// New Store
-// creates a new store for database operations
 func NewStore(dbname string) (*Store, error) {
 	var ended time.Time
 	uri := utils.ParseURIFromEnv()
