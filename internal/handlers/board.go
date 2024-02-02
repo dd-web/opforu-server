@@ -86,26 +86,22 @@ func (bh *BoardHandler) RegisterBoardShort(rc *types.RequestCtx) error {
 // METHOD: GET
 // PATH: host.com/api/boards/{short}
 func (bh *BoardHandler) handleBoardShort(rc *types.RequestCtx) error {
-	var pipeline bson.A
-	var count int64
-	var threads []bson.M
-	var board *types.Board
-
 	vars := mux.Vars(rc.Request)
+	var board *types.Board
 
 	board, err := rc.Store.FindBoardByShort(vars["short"])
 	if err != nil {
 		return err
 	}
 
-	pipeline, err = builder.QrStrLookupThreads(board.ID, rc.Query)
+	pipeline, err := builder.QrStrLookupThreads(board.ID, rc.Query)
 	if err != nil {
 		return err
 	}
 
-	count = rc.Store.CountResults("threads", append(bson.D{{Key: "board", Value: board.ID}}, rc.Query.Search...))
+	count := rc.Store.CountResults("threads", append(bson.D{{Key: "board", Value: board.ID}}, rc.Query.Search...))
 
-	threads, err = rc.Store.RunAggregation("threads", pipeline)
+	threads, err := rc.Store.RunAggregation("threads", pipeline)
 	if err != nil {
 		return err
 	}

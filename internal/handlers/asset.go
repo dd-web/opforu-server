@@ -181,8 +181,5 @@ func (ah *AssetHandler) handleNewAsset(rc *types.RequestCtx) error {
 		rc.AddToResponseList("local_id", details.LocalID)
 	}
 
-	// cleanup
-	// _ = os.Remove(tmp.Dir)
-
 	return ResolveResponse(rc)
 }

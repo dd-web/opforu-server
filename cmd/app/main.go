@@ -26,10 +26,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = store.HydrateCache()
-	if err != nil {
-		log.Fatal(err)
-	}
+	// disable cache until fully implemented
+	// err = store.HydrateCache()
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	handler := types.NewRoutingHandler(store)
 

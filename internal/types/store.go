@@ -207,26 +207,25 @@ func (s *Store) HydrateCache() error {
 // Find Board By Short Name
 // - accepts a string of the board short name
 // - returns a pointer to the board
-//
-//	Attempts to find the board in the cache first, if it's not found it will be looked up in the database and cached for future use.
 func (s *Store) FindBoardByShort(short string) (*Board, error) {
+	// disable cache for now until it's fully implemented with invalidation & refreshes etc.
 	var board *Board
-	c_board, ok := s.Cache.Boards[short]
-	if ok {
-		board = c_board
-	}
+	// c_board, ok := s.Cache.Boards[short]
+	// if ok {
+	// 	board = c_board
+	// }
 
-	if board == nil {
-		collection := s.DB.Collection("boards")
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
+	//if board == nil {
+	collection := s.DB.Collection("boards")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-		err := collection.FindOne(ctx, bson.D{{Key: "short", Value: short}}).Decode(&board)
-		if err != nil {
-			return nil, err
-		}
-		s.Cache.Boards[short] = board
+	err := collection.FindOne(ctx, bson.D{{Key: "short", Value: short}}).Decode(&board)
+	if err != nil {
+		return nil, err
 	}
+	// s.Cache.Boards[short] = board
+	//}
 	return board, nil
 }
 
@@ -253,32 +252,31 @@ func (s *Store) CountResults(col string, filter bson.D) int64 {
 // - accepts a string of the session id
 // - returns a pointer to the session
 // - returns an error if one occurs
-//
-//	Attempts to find the session in the cache first, if it's not found it will be looked up in the database and cached for future use.
 func (s *Store) FindSession(id string) (*Session, error) {
+	// disable cache until it's fully implemented
 	if id == "" {
 		return nil, fmt.Errorf("session id is empty")
 	}
 
 	var session *Session
 
-	c_session, ok := s.Cache.Sessions[id]
-	if ok {
-		session = c_session
-	}
+	// c_session, ok := s.Cache.Sessions[id]
+	// if ok {
+	// 	session = c_session
+	// }
 
-	if session == nil {
-		collection := s.DB.Collection("sessions")
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
+	// if session == nil {
+	collection := s.DB.Collection("sessions")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-		err := collection.FindOne(ctx, bson.D{{Key: "session_id", Value: id}}).Decode(&session)
-		if err != nil {
-			fmt.Println("FindSession error:", err)
-			return nil, err
-		}
-		s.Cache.Sessions[id] = session
+	err := collection.FindOne(ctx, bson.D{{Key: "session_id", Value: id}}).Decode(&session)
+	if err != nil {
+		fmt.Println("FindSession error:", err)
+		return nil, err
 	}
+	// s.Cache.Sessions[id] = session
+	// }
 
 	return session, nil
 }
@@ -317,27 +315,30 @@ func (s *Store) FindAccountByUsernameOrEmail(username string, email string) (*Ac
 //
 // attempts to look up both account and session from the cache first, if unavailable they will be looked up in the database and cached for future use.
 func (s *Store) FindAccountFromSession(id string) (*Account, error) {
+	// disable cache until it's fully implemented
 	if id == "" {
 		return nil, fmt.Errorf("session id is empty")
 	}
 
-	var session *Session
-	var account *Account
+	session := &Session{}
+	account := &Account{}
 
-	c_session, ok := s.Cache.Sessions[id]
-	if ok {
-		session = c_session
-		c_account, ok := s.Cache.Accounts[session.AccountID]
-		if ok {
-			account = c_account
-		}
-	}
+	// c_session, ok := s.Cache.Sessions[id]
+	// if ok {
+	// 	session = c_session
+	// 	c_account, ok := s.Cache.Accounts[session.AccountID]
+	// 	if ok {
+	// 		account = c_account
+	// 	}
+	// }
 
-	if account != nil {
-		return account, nil
-	}
+	// if account != nil {
+	// 	return account, nil
+	// }
 
-	if session == nil { // it's possible session is cached but not the account - check it
+	// if session == nil {
+	// Session retrieval
+	{
 		collection := s.DB.Collection("sessions")
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -346,21 +347,25 @@ func (s *Store) FindAccountFromSession(id string) (*Account, error) {
 		if err != nil {
 			return nil, err
 		}
-		session.IsExpiringSoon()
+	}
+	// session.IsExpiringSoon()
 
-		s.Cache.Sessions[id] = session
+	// s.Cache.Sessions[id] = session
+	// }
+
+	// Account retrieval
+	{
+		collection := s.DB.Collection("accounts")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		err := collection.FindOne(ctx, bson.D{{Key: "_id", Value: session.AccountID}}).Decode(&account)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	collection := s.DB.Collection("accounts")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err := collection.FindOne(ctx, bson.D{{Key: "_id", Value: session.AccountID}}).Decode(&account)
-	if err != nil {
-		return nil, err
-	}
-
-	s.Cache.Accounts[session.AccountID] = account
+	// s.Cache.Accounts[session.AccountID] = account
 
 	return account, nil
 }
