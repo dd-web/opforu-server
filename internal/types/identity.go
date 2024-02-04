@@ -90,3 +90,11 @@ func randSuffix() string {
 func NewIdentityStyle() string {
 	return "variant-" + randPrefix() + "-" + randSuffix()
 }
+
+// returns a filter object that resolves an identity from a particular thread using specified account
+func FindFilterIdentityInThread(thread_id, account_id primitive.ObjectID) bson.D {
+	return bson.D{
+		{Key: "thread", Value: thread_id},
+		{Key: "account", Value: account_id},
+	}
+}

@@ -10,6 +10,7 @@ import (
 	"github.com/dd-web/opforu-server/internal/types"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type BoardHandler struct {
@@ -124,7 +125,7 @@ func (bh *BoardHandler) handleNewThread(rc *types.RequestCtx) error {
 	vars := mux.Vars(rc.Request)
 	board, err := rc.Store.FindBoardByShort(vars["short"])
 	if err != nil {
-		return err
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
 	}
 
 	details := types.NewRUMThread()
@@ -157,17 +158,19 @@ func (bh *BoardHandler) handleNewThread(rc *types.RequestCtx) error {
 
 	thread := types.NewThread()
 
+	newIdentity.Thread = thread.ID
 	thread.Title = details.Title
 	thread.Body = details.Content
 	thread.Board = board.ID
 	thread.Creator = newIdentity.ID
-	thread.Mods = append(thread.Mods, newIdentity.ID)
+	thread.Mods = []primitive.ObjectID{newIdentity.ID}
 
 	for _, v := range newThreadAssets {
 		thread.Assets = append(thread.Assets, v.ID)
 		newThreadAssetInterfaces = append(newThreadAssetInterfaces, v)
 	}
 
+	// save & update associated docs
 	err = rc.Store.SaveNewMulti(newThreadAssetInterfaces, "assets")
 	if err != nil {
 		return ResolveResponseErr(rc, types.ErrorUnexpected())

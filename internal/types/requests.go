@@ -46,3 +46,16 @@ func NewRUMThread() *RUMThread {
 		Assets:  make([]RUMAssetAttachment, 0),
 	}
 }
+
+// same as thread but without a title
+type RUMPost struct {
+	Content string               `json:"content"`
+	Assets  []RUMAssetAttachment `json:"assets"`
+}
+
+func NewRUMPost() *RUMPost {
+	return &RUMPost{
+		Content: "",
+		Assets:  make([]RUMAssetAttachment, 0),
+	}
+}

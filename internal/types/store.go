@@ -51,7 +51,8 @@ type Store struct {
 }
 
 func NewStore(dbname string) (*Store, error) {
-	var ended time.Time
+	// var ended time.Time
+	ended := time.Time{}
 	uri := utils.ParseURIFromEnv()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer func() {
@@ -144,17 +145,6 @@ func (s *Store) SaveNewSingle(document any, col string) error {
 	return nil
 }
 
-// func (s *Store) UpdateSingle(id primitive.ObjectID, col string, updateQuery bson.D) error {
-// 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-// 	defer cancel()
-
-// 	collection := s.DB.Collection(col)
-// 	opts := options.Update().SetUpsert(false)
-
-// 	result, err := collection.UpdateByID(ctx, id, updateQuery)
-
-// }
-
 // Delete a single Document
 // - accepts a primitive.ObjectID of the document to be deleted
 // - accepts a string of the collection name
@@ -175,8 +165,6 @@ func (s *Store) DeleteSingle(id primitive.ObjectID, col string) error {
 
 // Hydrate Cache
 // - returns an error if one occurs
-//
-//	Attempts to hydrate the cache with frequently used data from the database, like boards.
 func (s *Store) HydrateCache() error {
 	collection := s.DB.Collection("boards")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -204,18 +192,17 @@ func (s *Store) HydrateCache() error {
 	return nil
 }
 
-// Find Board By Short Name
+/*******************************************************************************************
+ * Board Operations
+ *******************************************************************************************/
+
+// Find board by short
 // - accepts a string of the board short name
 // - returns a pointer to the board
 func (s *Store) FindBoardByShort(short string) (*Board, error) {
-	// disable cache for now until it's fully implemented with invalidation & refreshes etc.
-	var board *Board
-	// c_board, ok := s.Cache.Boards[short]
-	// if ok {
-	// 	board = c_board
-	// }
+	// var board *Board
+	board := &Board{}
 
-	//if board == nil {
 	collection := s.DB.Collection("boards")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -224,62 +211,93 @@ func (s *Store) FindBoardByShort(short string) (*Board, error) {
 	if err != nil {
 		return nil, err
 	}
-	// s.Cache.Boards[short] = board
-	//}
+
 	return board, nil
 }
 
-// Count Results
-// - accepts a string of the collection name
-// - accepts a bson.D of the filter
-// - returns an int64 of the count
-//
-//	Counts the number of documents matching the given filter in the specified collection.
-//	useful for pagination since when we query for results we're only receiving a subset of the total results.
-func (s *Store) CountResults(col string, filter bson.D) int64 {
-	var result int64 = 0
+// Find board by _id
+// - accepts primitive.ObjectID of the board (_id)
+// - returns a pointer to the board
+func (s *Store) FindBoardByObjectID(id primitive.ObjectID) (*Board, error) {
+	// var board *Board
+	board := &Board{}
 
-	count_options := options.Count().SetMaxTime(5 * time.Second)
-	collection := s.DB.Collection(col)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	result, _ = collection.CountDocuments(ctx, filter, count_options)
-	return result
-}
-
-// Find Session
-// - accepts a string of the session id
-// - returns a pointer to the session
-// - returns an error if one occurs
-func (s *Store) FindSession(id string) (*Session, error) {
-	// disable cache until it's fully implemented
-	if id == "" {
-		return nil, fmt.Errorf("session id is empty")
-	}
-
-	var session *Session
-
-	// c_session, ok := s.Cache.Sessions[id]
-	// if ok {
-	// 	session = c_session
-	// }
-
-	// if session == nil {
-	collection := s.DB.Collection("sessions")
+	collection := s.DB.Collection("boards")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err := collection.FindOne(ctx, bson.D{{Key: "session_id", Value: id}}).Decode(&session)
+	err := collection.FindOne(ctx, bson.D{{Key: "_id", Value: id}}).Decode(&board)
 	if err != nil {
-		fmt.Println("FindSession error:", err)
 		return nil, err
 	}
-	// s.Cache.Sessions[id] = session
-	// }
 
-	return session, nil
+	return board, nil
 }
+
+// Update the provided board
+// uses the passed board's ID and short name to determine which to update. essentially replaces old with new.
+// - accepts a pointer to a Board object
+// - returns an error if one occurred, else nil
+func (s *Store) UpdateBoard(board *Board) error {
+	collection := s.DB.Collection("boards")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	filter := bson.D{{Key: "_id", Value: board.ID}, {Key: "short", Value: board.Short}}
+
+	_, err := collection.ReplaceOne(ctx, filter, board)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+/*******************************************************************************************
+ * Thread Operations
+ *******************************************************************************************/
+
+// Find thread by slug
+// - accepts a string of thread slug
+// - returns a pointer to the thread
+func (s *Store) FindThreadBySlug(slug string) (*Thread, error) {
+	// var thread *Thread
+	thread := &Thread{}
+
+	collection := s.DB.Collection("threads")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := collection.FindOne(ctx, bson.D{{Key: "slug", Value: slug}}).Decode(&thread)
+	if err != nil {
+		return nil, err
+	}
+
+	return thread, nil
+}
+
+// Update the provided thread
+// uses the passed thread's ID and slug to determine which to update, essentially replaces old with new.
+// - accepts a pointer to a Thread object
+// - returns an error if one occurred, else nil
+func (s *Store) UpdateThread(thread *Thread) error {
+	collection := s.DB.Collection("threads")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	filter := bson.D{{Key: "_id", Value: thread.ID}, {Key: "slug", Value: thread.Slug}}
+
+	_, err := collection.ReplaceOne(ctx, filter, thread)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+/*******************************************************************************************
+ * Account Operations
+ *******************************************************************************************/
 
 // Find Account By Username or Email
 // - accepts a string of the username
@@ -294,28 +312,25 @@ func (s *Store) FindAccountByUsernameOrEmail(username string, email string) (*Ac
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	var criteraTwo string = email
+	criteraTwo := email
 	if email == "" {
 		criteraTwo = username
 	}
 
-	var result Account
+	result := &Account{}
 	err := collection.FindOne(ctx, bson.D{{Key: "$or", Value: bson.A{bson.D{{Key: "username", Value: username}}, bson.D{{Key: "email", Value: criteraTwo}}}}}).Decode(&result)
 	if err != nil {
 		return nil, err
 	}
 
-	return &result, nil
+	return result, nil
 }
 
 // Find Account By Session ID
 // - accepts a string of the session id
 // - returns a pointer to the associated account
 // - returns an error if one occurs
-//
-// attempts to look up both account and session from the cache first, if unavailable they will be looked up in the database and cached for future use.
 func (s *Store) FindAccountFromSession(id string) (*Account, error) {
-	// disable cache until it's fully implemented
 	if id == "" {
 		return nil, fmt.Errorf("session id is empty")
 	}
@@ -323,21 +338,6 @@ func (s *Store) FindAccountFromSession(id string) (*Account, error) {
 	session := &Session{}
 	account := &Account{}
 
-	// c_session, ok := s.Cache.Sessions[id]
-	// if ok {
-	// 	session = c_session
-	// 	c_account, ok := s.Cache.Accounts[session.AccountID]
-	// 	if ok {
-	// 		account = c_account
-	// 	}
-	// }
-
-	// if account != nil {
-	// 	return account, nil
-	// }
-
-	// if session == nil {
-	// Session retrieval
 	{
 		collection := s.DB.Collection("sessions")
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -348,12 +348,7 @@ func (s *Store) FindAccountFromSession(id string) (*Account, error) {
 			return nil, err
 		}
 	}
-	// session.IsExpiringSoon()
 
-	// s.Cache.Sessions[id] = session
-	// }
-
-	// Account retrieval
 	{
 		collection := s.DB.Collection("accounts")
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -365,21 +360,50 @@ func (s *Store) FindAccountFromSession(id string) (*Account, error) {
 		}
 	}
 
-	// s.Cache.Accounts[session.AccountID] = account
-
 	return account, nil
 }
+
+/*******************************************************************************************
+ * Session Operations
+ *******************************************************************************************/
+
+// Find Session
+// - accepts a string of the session id
+// - returns a pointer to the session
+// - returns an error if one occurs
+func (s *Store) FindSession(id string) (*Session, error) {
+	if id == "" {
+		return nil, fmt.Errorf("session id is empty")
+	}
+
+	var session *Session
+
+	collection := s.DB.Collection("sessions")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := collection.FindOne(ctx, bson.D{{Key: "session_id", Value: id}}).Decode(&session)
+	if err != nil {
+		return nil, err
+	}
+
+	return session, nil
+}
+
+/*******************************************************************************************
+ * Asset Operations
+ *******************************************************************************************/
 
 // runs a list of queries provided (hash collision query strings from builder)
 // returns an AssetSource of the first matching hash collision
 func (s *Store) AssetHashCollisionResolver(queries ...primitive.D) (*AssetSource, error) {
-	var found *AssetSource
+	// var found *AssetSource
+	found := &AssetSource{}
 	matched := false
 
 	for _, query := range queries {
 		result, err := s.assetColliderQuery(query)
 		if err != nil {
-			fmt.Println("error wasn't nil on a collision check:", err)
 			continue
 		}
 		if result != nil {
@@ -415,6 +439,60 @@ func (s *Store) assetColliderQuery(query primitive.D) (*AssetSource, error) {
 		return nil, nil
 	}
 
-	fmt.Println("Matching Hash Found (store collision check):", result)
 	return result, nil
+}
+
+/*******************************************************************************************
+ * Identity Operations
+ *******************************************************************************************/
+
+// Resolves an identity from a particular account & thread
+// if an identity cannot be found, one will be created and saved
+// - accepts primitive.ObjectID's of the account and thread
+// - returns a pointer to the identity
+func (s *Store) ResolveIdentity(account_id, thread_id primitive.ObjectID) (*Identity, error) {
+	collection := s.DB.Collection("identities")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	filter := FindFilterIdentityInThread(thread_id, account_id)
+
+	identity := &Identity{
+		ID: primitive.NilObjectID,
+	}
+
+	_ = collection.FindOne(ctx, filter).Decode(&identity)
+
+	if identity.ID == primitive.NilObjectID {
+		identity = NewIdentity()
+		identity.Account = account_id
+		identity.Thread = thread_id
+
+		err := s.SaveNewSingle(identity, "identities")
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return identity, nil
+}
+
+// Count Results
+// - accepts a string of the collection name
+// - accepts a bson.D of the filter
+// - returns an int64 of the count
+//
+//	Counts the number of documents matching the given filter in the specified collection.
+//	useful for pagination since when we query for results we're only receiving a subset of the total results.
+func (s *Store) CountResults(col string, filter bson.D) int64 {
+	// var result int64 = 0
+	result := int64(0)
+
+	count_options := options.Count().SetMaxTime(5 * time.Second)
+	collection := s.DB.Collection(col)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, _ = collection.CountDocuments(ctx, filter, count_options)
+	return result
 }

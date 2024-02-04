@@ -17,7 +17,7 @@ type Post struct {
 	ID primitive.ObjectID `bson:"_id,omitempty" json:"_id"`
 
 	PostNumber uint64             `bson:"post_number" json:"post_number"`
-	Creator    primitive.ObjectID `bson:"creator" json:"creator"`
+	Creator    primitive.ObjectID `bson:"creator" json:"creator"` // identity _id
 
 	Body   string               `bson:"body" json:"body"`
 	Assets []primitive.ObjectID `bson:"assets" json:"assets"`
