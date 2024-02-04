@@ -106,6 +106,7 @@ func (th *ThreadHandler) handleThreadReply(rc *types.RequestCtx) error {
 
 	post.PostNumber = board.PostRef + 1
 	post.Creator = identity.ID
+	post.Body = details.Content
 	post.Board = board.ID
 	post.Thread = thread.ID
 	thread.Posts = append(thread.Posts, post.ID)
