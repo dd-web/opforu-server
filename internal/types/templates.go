@@ -14,12 +14,32 @@ type TRegSub struct {
 }
 
 var (
-	// replacements
-	tmpl_blockquote string = `<blockquote class="post-quote">${1}</blockquote>`
-	tmpl_epl        string = `<button class="post-link epl" id="epl-${1}-${2}">${1} / ${2}</button>`
-	tmpl_ipl        string = `<button class="post-link ipl" id="ipl-${1}">${1}</button>`
+	rxp_post_internal_thread *TRegSub = &TRegSub{
+		Reg: regexp.MustCompile(`(?m)>>(\d+)\s`),
+		Sub: `<button class="post-internal-thread post-link">${1}</button>`,
+	}
 
-	// whitespace reduction on beginning of strings.
+	rxp_thread_internal_board *TRegSub = &TRegSub{
+		Reg: regexp.MustCompile(`(?m)>>([[:alnum:]]+[[:alpha:]]+[[:alnum:]]+)\s`),
+		Sub: `<button class="thread-internal-board post-link">${1}</button>`,
+	}
+
+	rxp_post_internal_board *TRegSub = &TRegSub{
+		Reg: regexp.MustCompile(`(?m)>>([[:alnum:]]+[[:alpha:]]+[[:alnum:]]+\/\d+)\s`),
+		Sub: `<button class="post-internal-board post-link">${1}</button>`,
+	}
+
+	rxp_thread_external_board *TRegSub = &TRegSub{
+		Reg: regexp.MustCompile(`(?m)>>([[:alpha:]]+\/[[:alnum:]]+[[:alpha:]]+[[:alnum:]]+)\s`),
+		Sub: `<button class="thread-external-board post-link">${1}</button>`,
+	}
+
+	rxp_post_external_board *TRegSub = &TRegSub{
+		Reg: regexp.MustCompile(`(?m)>>([[:alpha:]]+\/[[:alnum:]]+[[:alpha:]]+[[:alnum:]]+\/\d+)\s`),
+		Sub: `<button class="post-external-board post-link">${1}</button>`,
+	}
+
+	// whitespace reduction on beginning of strings
 	rxp_ws_start *TRegSub = &TRegSub{
 		Reg: regexp.MustCompile(`(?m)^[[:blank:]]{1,}`),
 		Sub: "",
@@ -27,38 +47,25 @@ var (
 
 	// whitespace preservation between lines
 	rxp_ws_mid *TRegSub = &TRegSub{
-		Reg: regexp.MustCompile(`(?m)[\n\r]{1,}`),
-		Sub: "<br>",
+		Reg: regexp.MustCompile(`(?m)[\n\r]{3,}`),
+		Sub: "\n",
 	}
 
-	// whitespace reduction on end of strings.
-	// takes care of excessive newline feeds as well
+	// whitespace reduction on end of strings
 	rxp_ws_end *TRegSub = &TRegSub{
-		Reg: regexp.MustCompile(`(?m)[\n\r\s]{2,}$`),
-		Sub: "<br>",
+		Reg: regexp.MustCompile(`(?m)[[:blank:]]{1,}$`),
+		Sub: "",
 	}
 
 	// template regex quotes
 	rxp_quote *TRegSub = &TRegSub{
-		Reg: regexp.MustCompile(`(?m)^>([^>].*)$`),
-		Sub: tmpl_blockquote,
-	}
-
-	// same thread post links
-	rxp_ipl *TRegSub = &TRegSub{
-		Reg: regexp.MustCompile(`(?m)>>(\d{1,})`),
-		Sub: tmpl_ipl,
-	}
-
-	// external post links
-	rxp_epl *TRegSub = &TRegSub{
-		Reg: regexp.MustCompile(`(?m)>>/([a-zA-Z]*)/(\d*)`),
-		Sub: tmpl_epl,
+		Reg: regexp.MustCompile(`(?m)^>([^>].+)$`),
+		Sub: `<blockquote class="reply-quote">${1}</blockquote>`,
 	}
 )
 
 // Template Thread Reply
-// used as a wrapper for the entirety of the reply contents, including furthur nested templates.
+// used as a wrapper for the entirety of the reply contents, including furthur nested templates
 type TemplateThreadReply struct {
 	Content string
 	RegOps  []*TRegSub
@@ -71,9 +78,12 @@ func NewTemplateThreadReply(content string) *TemplateThreadReply {
 			rxp_ws_start,
 			rxp_ws_end,
 			rxp_ws_mid,
+			rxp_post_internal_thread,
+			rxp_thread_internal_board,
+			rxp_post_internal_board,
+			rxp_thread_external_board,
+			rxp_post_external_board,
 			rxp_quote,
-			rxp_ipl,
-			rxp_epl,
 		},
 	}
 }
