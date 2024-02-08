@@ -1,18 +1,7 @@
 // bsonbuilder.go
 //
-// This package is to ease the construction of binary key value pair objects (bson)
-// specifically, this is for use with the mongo-go-driver.
-//
-// Generally, a single key/value pair constructor will have a cooresponding func "BsonX" where X is the
-// type of object to construct. Internally all key/value pairs are bson.E but it's not alway necessary
-// to specify this when constructing the object.
-//
-// I specifically define Key and Value fields to please the linter and make it very clear what is going on.
-// Again, generally this isn't necessary but it's good to see exactly what is going on.
-//
-// If an object is made up of multiple ground level bson.E fields, it's cooresponding func "ComposeBsonX" will
-// take a map[string]any containing the key/value pairs to be constructed. The object will be constructed
-// in the order of the map received, if it matters (bson.D)
+// This package is to ease the construction of binary k/v objects
+// specifically, this is for use with the mongo-driver.
 
 package builder
 

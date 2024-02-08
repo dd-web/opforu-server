@@ -118,7 +118,6 @@ func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error 
 	if err != nil {
 		fmt.Println("Error reading body", err)
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
-		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"}, rc)
 	}
 
 	var parsed struct {
@@ -132,21 +131,18 @@ func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error 
 	if err != nil {
 		fmt.Println("Error parsing body", err)
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
-		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "invalid request body"}, rc)
 	}
 
 	account, _ := rc.Store.FindAccountByUsernameOrEmail(parsed.Username, parsed.Email)
 	if account != nil {
 		fmt.Println("Account already exists")
 		return ResolveResponseErr(rc, types.ErrorConflict("email or username already exists"))
-		// return HandleSendJSON(rc.Writer, http.StatusBadRequest, bson.M{"error": "account already exists"}, rc)
 	}
 
 	pwh, err := utils.HashPassword(parsed.Password)
 	if err != nil {
 		fmt.Println("Error hashing password", err)
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
-		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
 	}
 
 	newAccount := types.NewAccount()
@@ -160,14 +156,13 @@ func (ah *AccountHandler) handlePostAccountRegister(rc *types.RequestCtx) error 
 	if err != nil {
 		fmt.Println("Error saving new account", err)
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
-		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
 	}
 
 	err = rc.Store.SaveNewSingle(session, "sessions")
 	if err != nil {
 		fmt.Println("Error saving new session", err)
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
-		// return HandleSendJSON(rc.Writer, http.StatusInternalServerError, bson.M{"error": "unexpected server error"}, rc)
+
 	}
 
 	rc.AccountCtx.Account = newAccount

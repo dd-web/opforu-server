@@ -92,19 +92,19 @@ func (bh *BoardHandler) handleBoardShort(rc *types.RequestCtx) error {
 
 	board, err := rc.Store.FindBoardByShort(vars["short"])
 	if err != nil {
-		return err
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
 	}
 
 	pipeline, err := builder.QrStrLookupThreads(board.ID, rc.Query)
 	if err != nil {
-		return err
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
 	}
 
 	count := rc.Store.CountResults("threads", append(bson.D{{Key: "board", Value: board.ID}}, rc.Query.Search...))
 
 	threads, err := rc.Store.RunAggregation("threads", pipeline)
 	if err != nil {
-		return err
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
 	}
 
 	rc.Pagination.Update(int(count))

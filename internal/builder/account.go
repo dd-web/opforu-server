@@ -10,6 +10,5 @@ var (
 
 // account lookup pipeline
 func QrStrLookupAccount(pk string) bson.D {
-	projection := bson.A{BsonProjection(public_account_fields, 1)}
-	return BsonLookup("accounts", pk, "_id", pk, bson.D{}, projection)
+	return BsonLookup("accounts", pk, "_id", pk, bson.D{}, bson.A{BsonProjection(public_account_fields, 1)})
 }

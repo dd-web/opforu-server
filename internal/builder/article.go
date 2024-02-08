@@ -6,7 +6,7 @@ import (
 )
 
 // list of paginated articles
-func QrStrLookupArticle(cfg *types.QueryCtx) bson.A {
+func QrStrLookupArticleList(cfg *types.QueryCtx) bson.A {
 	sortField := cfg.Sort
 	if sortField == "" {
 		sortField = "created_at"
@@ -28,6 +28,19 @@ func QrStrLookupArticle(cfg *types.QueryCtx) bson.A {
 	}
 }
 
+// single article with populated comments
+func QrStrLookupArticle(slug string) bson.A {
+	return bson.A{
+		BsonOperator("$match", "slug", slug),
+		QrStrLookupArticleAuthor("author"),
+		BsonD("$unset", "author.author._id"),
+		BsonOperator("$addFields", "author", BsonOperWithArray("$arrayElemAt", []interface{}{"$author", 0})),
+		BsonOperator("$addFields", "author", "$author.author"),
+		BsonLookup("article_comments", "comments", "_id", "comments", bson.D{}, getCommentPipe()),
+		QrStrLookupAssets(),
+	}
+}
+
 // article author lookup
 func QrStrLookupArticleAuthor(pk string) bson.D {
 	return BsonLookup("article_authors", pk, "_id", pk, bson.D{}, getAuthorPipe())
@@ -39,5 +52,19 @@ func getAuthorPipe() bson.A {
 		QrStrLookupAccount("author"),
 		BsonOperator("$addFields", "author", BsonOperWithArray("$arrayElemAt", []interface{}{"$author", 0})),
 		BsonOperator("$addFields", "author.username", BsonOperWithArray("$cond", []interface{}{"$anonymize", "anonymous", "$author.username"})),
+	}
+}
+
+// comment lookup internal pipe
+func getCommentPipe() bson.A {
+	return bson.A{
+		QrStrLookupAccount("author"),
+		BsonOperator("$addFields", "author", BsonOperWithArray("$arrayElemAt", []interface{}{"$author", 0})),
+		BsonOperator("$addFields", "author.username", BsonOperWithArray("$cond", []interface{}{"$author_anonymous", "anonymous", "$author.username"})),
+		BsonD("$unset", "author._id"),
+		BsonD("$unset", "author.created_at"),
+		BsonD("$unset", "author.updated_at"),
+		BsonD("$unset", "author_anonymous"),
+		QrStrLookupAssets(),
 	}
 }

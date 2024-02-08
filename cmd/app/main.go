@@ -51,6 +51,7 @@ func main() {
 
 	// articles
 	handler.Router.HandleFunc("/api/articles", handlers.WrapFn(handler_article.RegisterArticleRoot))
+	handler.Router.HandleFunc("/api/articles/{slug}", handlers.WrapFn(handler_article.RegisterArticleSlug))
 
 	// assets
 	handler.Router.HandleFunc("/api/assets", handlers.WrapFn(handler_asset.RegisterAssetRoot))
