@@ -36,6 +36,13 @@ func QrStrLookupArticle(slug string) bson.A {
 		BsonD("$unset", "author.author._id"),
 		BsonOperator("$addFields", "author", BsonOperWithArray("$arrayElemAt", []interface{}{"$author", 0})),
 		BsonOperator("$addFields", "author", "$author.author"),
+		BsonD("$unset", "author.created_at"),
+		BsonD("$unset", "author.updated_at"),
+		QrStrLookupArticleAuthor("co_authors"),
+		BsonOperator("$addFields", "co_authors", "$co_authors.author"),
+		BsonD("$unset", "co_authors._id"),
+		BsonD("$unset", "co_authors.created_at"),
+		BsonD("$unset", "co_authors.updated_at"),
 		BsonLookup("article_comments", "comments", "_id", "comments", bson.D{}, getCommentPipe()),
 		QrStrLookupAssets(),
 	}
