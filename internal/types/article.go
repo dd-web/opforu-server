@@ -1,15 +1,22 @@
 package types
 
 import (
+	"math/rand"
 	"time"
 
+	gonanoid "github.com/matoous/go-nanoid/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var (
-	// permissions
 	PUBLIC_ARTICLE_FIELDS = []string{"title", "body", "slug", "author", "co_authors", "status", "tags", "created_at", "updated_at", "deleted_at"}
+
+	// char sets
+	// min/max only apply to randomly generated slugs. reserved/specified slugs can be up to 128 characters.
+	ARTICLE_SLUG_CHAR_SET = "abcdefghijklmnopqrstuvwxyz0123456789"
+	ARTICLE_MAX_SLUG_LEN  = 16
+	ARTICLE_MIN_SLUG_LEN  = 10
 )
 
 type Article struct {
@@ -34,6 +41,25 @@ type Article struct {
 	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
+func NewArticle() *Article {
+	ts := time.Now().UTC()
+	return &Article{
+		ID:         primitive.NewObjectID(),
+		AuthorID:   primitive.NilObjectID,
+		CoAuthors:  []primitive.ObjectID{},
+		Status:     ArticleStatusDraft,
+		CommentRef: 0,
+		Comments:   []primitive.ObjectID{},
+		Assets:     []primitive.ObjectID{},
+		Title:      "",
+		Body:       "",
+		Slug:       NewArticleSlug(),
+		Tags:       []string{},
+		CreatedAt:  &ts,
+		UpdatedAt:  &ts,
+	}
+}
+
 type ArticleComment struct {
 	ID         primitive.ObjectID `json:"_id" bson:"_id,omitempty"`
 	AuthorID   primitive.ObjectID `json:"author" bson:"author"`                     // account id
@@ -48,10 +74,32 @@ type ArticleComment struct {
 	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
+func NewArticleComment() *ArticleComment {
+	ts := time.Now().UTC()
+	return &ArticleComment{
+		ID:            primitive.NewObjectID(),
+		AuthorID:      primitive.NilObjectID,
+		AuthorAnon:    false,
+		CommentNumber: 0,
+		Body:          "",
+		Assets:        []primitive.ObjectID{},
+		CreatedAt:     &ts,
+		UpdatedAt:     &ts,
+	}
+}
+
 type ArticleAuthor struct {
 	ID        primitive.ObjectID `json:"_id" bson:"_id,omitempty"`
 	AuthorID  primitive.ObjectID `json:"author" bson:"author"`       // account id
 	Anonymize bool               `json:"anonymize" bson:"anonymize"` // make author/coauthor with above id anonymous
+}
+
+func NewArticleAuthor() *ArticleAuthor {
+	return &ArticleAuthor{
+		ID:        primitive.NewObjectID(),
+		AuthorID:  primitive.NilObjectID,
+		Anonymize: false,
+	}
 }
 
 type ArticleStatus string
@@ -62,17 +110,6 @@ const (
 	ArticleStatusArchived  ArticleStatus = "archived"
 	ArticleStatusDeleted   ArticleStatus = "deleted"
 )
-
-func NewArticle() *Article {
-	ts := time.Now().UTC()
-	return &Article{
-		ID:        primitive.NewObjectID(),
-		CoAuthors: []primitive.ObjectID{},
-		Tags:      []string{},
-		CreatedAt: &ts,
-		UpdatedAt: &ts,
-	}
-}
 
 // ClientFormatter implementation
 func (a *Article) CLFormat() bson.M {
@@ -87,4 +124,10 @@ func (a *Article) CLFormat() bson.M {
 		"created_at": a.CreatedAt,
 		"updated_at": a.UpdatedAt,
 	}
+}
+
+func NewArticleSlug() string {
+	slugLen := rand.Intn(ARTICLE_MAX_SLUG_LEN-ARTICLE_MIN_SLUG_LEN) + ARTICLE_MAX_SLUG_LEN
+	slug, _ := gonanoid.Generate(ARTICLE_SLUG_CHAR_SET, slugLen)
+	return slug
 }

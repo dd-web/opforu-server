@@ -126,6 +126,15 @@ func NewAsset(src primitive.ObjectID, acct primitive.ObjectID) *Asset {
 	}
 }
 
+// clone an existing asset but replace the account_id with a new one
+func CloneAsset(asset *Asset, account_id primitive.ObjectID) *Asset {
+	newAsset := NewAsset(asset.SourceID, account_id)
+	newAsset.Description = asset.Description
+	newAsset.FileName = asset.FileName
+	newAsset.Tags = asset.Tags
+	return newAsset
+}
+
 // Details about the file, since files can have avatar and source files this is abstracted out. Both may not need all of these.
 type FileCtx struct {
 	ServerFileName string `json:"server_file_name" bson:"server_file_name"`

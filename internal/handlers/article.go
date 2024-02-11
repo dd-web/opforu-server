@@ -1,6 +1,10 @@
 package handlers
 
 import (
+	"encoding/json"
+	"io"
+	"time"
+
 	"github.com/dd-web/opforu-server/internal/builder"
 	"github.com/dd-web/opforu-server/internal/types"
 	"github.com/gorilla/mux"
@@ -60,7 +64,9 @@ func (ah *ArticleHandler) RegisterArticleSlug(rc *types.RequestCtx) error {
 
 	switch rc.Request.Method {
 	case "GET":
-		return ah.handleArticleShort(rc)
+		return ah.handleGetSingleArticle(rc)
+	case "POST":
+		return ah.handleNewArticleComment(rc)
 	default:
 		return HandleUnsupportedMethod(rc.Writer, rc.Request)
 	}
@@ -68,10 +74,8 @@ func (ah *ArticleHandler) RegisterArticleSlug(rc *types.RequestCtx) error {
 
 // METHOD: GET
 // PATH: host.com/api/articles/{slug}
-func (ah *ArticleHandler) handleArticleShort(rc *types.RequestCtx) error {
+func (ah *ArticleHandler) handleGetSingleArticle(rc *types.RequestCtx) error {
 	vars := mux.Vars(rc.Request)
-	// articles := []bson.M{}
-
 	pipeline := builder.QrStrLookupArticle(vars["slug"])
 
 	article, err := rc.Store.RunAggregation("articles", pipeline)
@@ -79,6 +83,93 @@ func (ah *ArticleHandler) handleArticleShort(rc *types.RequestCtx) error {
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
 	}
 
+	if len(article) == 0 {
+		return ResolveResponseErr(rc, types.ErrorNotFound("article not found"))
+	}
+
 	rc.AddToResponseList("article", article[0])
+	return ResolveResponse(rc)
+}
+
+// METHOD: POST
+// PATH: host.com/api/articles/{slug}
+func (ah *ArticleHandler) handleNewArticleComment(rc *types.RequestCtx) error {
+	if rc.UnresolvedAccount {
+		return ResolveResponseErr(rc, types.ErrorUnauthorized())
+	}
+
+	// setup necessary dependencies
+	vars := mux.Vars(rc.Request)
+	ts := time.Now().UTC()
+	details := types.NewRUMComment()
+
+	article, err := rc.Store.FindArticleBySlug(vars["slug"])
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	body, err := io.ReadAll(rc.Request.Body)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	err = json.Unmarshal(body, &details)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	// dependency injection
+	newCommentAssets := []*types.Asset{}
+	newCommentAssetInterfaces := []interface{}{}
+
+	for _, v := range details.Assets {
+		a := types.NewAsset(v.SourceID, rc.AccountCtx.Account.ID)
+		a.FileName = v.FileName
+		a.Description = v.Description
+		a.Tags = v.Tags
+		newCommentAssets = append(newCommentAssets, a)
+	}
+
+	// @todo - replace with parsed body
+	commentBody := details.Content
+
+	comment := types.NewArticleComment()
+
+	article.CommentRef++
+	comment.CommentNumber = article.CommentRef
+	comment.Body = commentBody
+	comment.AuthorID = rc.AccountCtx.Account.ID
+
+	comment.UpdatedAt = &ts
+	article.UpdatedAt = &ts
+
+	if details.MakeAnonymous && rc.AccountCtx.Account.IsStaff() {
+		comment.AuthorAnon = true
+	}
+
+	for _, v := range newCommentAssets {
+		comment.Assets = append(comment.Assets, v.ID)
+		newCommentAssetInterfaces = append(newCommentAssetInterfaces, v)
+	}
+
+	article.Comments = append(article.Comments, comment.ID)
+
+	// save & update associative docs
+	err = rc.Store.SaveNewMulti(newCommentAssetInterfaces, "assets")
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	err = rc.Store.SaveNewSingle(comment, "article_comments")
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	err = rc.Store.UpdateArticle(article)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	rc.AddToResponseList("comment_number", comment.CommentNumber)
 	return ResolveResponse(rc)
 }

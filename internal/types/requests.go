@@ -59,3 +59,47 @@ func NewRUMPost() *RUMPost {
 		Assets:  make([]RUMAssetAttachment, 0),
 	}
 }
+
+type RUMComment struct {
+	Content       string               `json:"content"`
+	Assets        []RUMAssetAttachment `json:"assets"`
+	MakeAnonymous bool                 `json:"make_anonymous"`
+}
+
+func NewRUMComment() *RUMComment {
+	return &RUMComment{
+		Content:       "",
+		Assets:        make([]RUMAssetAttachment, 0),
+		MakeAnonymous: false,
+	}
+}
+
+type RUMFavoriteAsset struct {
+	AssetID primitive.ObjectID `json:"asset_id"`
+}
+
+func NewRUMFavoriteAsset() *RUMFavoriteAsset {
+	return &RUMFavoriteAsset{
+		AssetID: primitive.NilObjectID,
+	}
+}
+
+// Request Response Marshaller
+type RRMFAOper string
+
+const (
+	RRMFAOperAdd    RRMFAOper = "add"
+	RRMFAOperRemove RRMFAOper = "remove"
+)
+
+type RRMFavoriteAsset struct {
+	AssetID primitive.ObjectID `json:"asset_id"`
+	Oper    RRMFAOper          `json:"oper"`
+}
+
+func NewRRMFavoriteAsset() *RRMFavoriteAsset {
+	return &RRMFavoriteAsset{
+		AssetID: primitive.NilObjectID,
+		Oper:    RRMFAOperAdd,
+	}
+}

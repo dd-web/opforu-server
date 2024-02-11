@@ -193,6 +193,47 @@ func (s *Store) HydrateCache() error {
 }
 
 /*******************************************************************************************
+ * Article Operations
+ *******************************************************************************************/
+
+// Find article by slug
+// - accepts a string of the articles slug
+// - returns pointer to the article
+func (s *Store) FindArticleBySlug(slug string) (*Article, error) {
+	article := &Article{}
+
+	collection := s.DB.Collection("articles")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := collection.FindOne(ctx, bson.D{{Key: "slug", Value: slug}}).Decode(&article)
+	if err != nil {
+		return nil, err
+	}
+
+	return article, nil
+}
+
+// Update the provided article
+// uses the provided article's ID to determine which to update
+// - accepts a pointer to an article
+// - returns an error if one occurred, else nil
+func (s *Store) UpdateArticle(article *Article) error {
+	collection := s.DB.Collection("articles")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	filter := bson.D{{Key: "_id", Value: article.ID}}
+
+	_, err := collection.ReplaceOne(ctx, filter, article)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+/*******************************************************************************************
  * Board Operations
  *******************************************************************************************/
 
@@ -200,7 +241,6 @@ func (s *Store) HydrateCache() error {
 // - accepts a string of the board short name
 // - returns a pointer to the board
 func (s *Store) FindBoardByShort(short string) (*Board, error) {
-	// var board *Board
 	board := &Board{}
 
 	collection := s.DB.Collection("boards")
@@ -363,6 +403,42 @@ func (s *Store) FindAccountFromSession(id string) (*Account, error) {
 	return account, nil
 }
 
+// Find favorite asset list by account id
+// - accepts an objectID of the account
+// - returns a pointer to the list, or an error if one occurs
+func (s *Store) FindAccountFavoriteAssetList(id primitive.ObjectID) (*FavoriteAssetList, error) {
+	collection := s.DB.Collection("favorite_asset_lists")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	list := &FavoriteAssetList{}
+	err := collection.FindOne(ctx, bson.D{{Key: "account", Value: id}}).Decode(&list)
+	if err != nil {
+		return nil, err
+	}
+
+	return list, nil
+}
+
+// Update the provided FavoriteAssetList
+// uses the passed list's id and it's account id to determine which to update and replace old with new
+// - accepts a pointer to a FavoriteAssetList object
+// - returns an error if one occurred, else nil
+func (s *Store) UpdateFavoriteAssetList(list *FavoriteAssetList) error {
+	collection := s.DB.Collection("favorite_asset_lists")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	filter := bson.D{{Key: "_id", Value: list.ID}, {Key: "account", Value: list.AccountID}}
+
+	_, err := collection.ReplaceOne(ctx, filter, list)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 /*******************************************************************************************
  * Session Operations
  *******************************************************************************************/
@@ -439,6 +515,23 @@ func (s *Store) assetColliderQuery(query primitive.D) (*AssetSource, error) {
 		return nil, nil
 	}
 
+	return result, nil
+}
+
+// find asset (not source) by it's id
+func (s *Store) FindAssetByID(id primitive.ObjectID) (*Asset, error) {
+	collection := s.DB.Collection("assets")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result := &Asset{
+		ID: primitive.NilObjectID,
+	}
+
+	err := collection.FindOne(ctx, bson.D{{Key: "_id", Value: id}}).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
