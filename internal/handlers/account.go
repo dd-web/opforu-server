@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/dd-web/opforu-server/internal/types"
 	"github.com/dd-web/opforu-server/internal/utils"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type AccountHandler struct {
@@ -222,118 +220,4 @@ func (ah *AccountHandler) handlePostAccountLogout(rc *types.RequestCtx) error {
 
 	// bypass the response resolver so it doesn't auto populate the deleted session
 	return HandleSendJSON(rc.Writer, http.StatusOK, bson.M{"message": "logged out"}, rc)
-}
-
-/***********************************************************************************************/
-/* ROOT path: host.com/api/account/favorites
-/***********************************************************************************************/
-
-func (ah *AccountHandler) RegisterAccountFavoriteRoot(rc *types.RequestCtx) error {
-	rc.UpdateStore(ah.rh.Store)
-
-	switch rc.Request.Method {
-	case "GET":
-		return ah.handleGetFavoriteList(rc)
-	case "POST":
-		return ah.handleAddRemoveFavorite(rc)
-	default:
-		return HandleUnsupportedMethod(rc.Writer, rc.Request)
-	}
-}
-
-// METHOD: GET
-// PATH: host.com/api/account/favorites
-func (ah *AccountHandler) handleGetFavoriteList(rc *types.RequestCtx) error {
-	if rc.UnresolvedAccount {
-		return ResolveResponseErr(rc, types.ErrorUnauthorized())
-	}
-
-	list, err := rc.Store.FindAccountFavoriteAssetList(rc.AccountCtx.Account.ID)
-	if err != nil {
-		return ResolveResponseErr(rc, types.ErrorNotFound("list not found"))
-	}
-
-	// @TODO: implement asset aggregation pipeline from here. as of now we'll just get a list of objectID's
-	rc.AddToResponseList("favorite_assets", list.Items)
-
-	return ResolveResponse(rc)
-}
-
-// METHOD: POST
-// PATH: host.com/api/account/favorites
-func (ah *AccountHandler) handleAddRemoveFavorite(rc *types.RequestCtx) error {
-	if rc.UnresolvedAccount {
-		return ResolveResponseErr(rc, types.ErrorUnauthorized())
-	}
-
-	ts := time.Now().UTC()
-	RRMOper := types.NewRRMFavoriteAsset()
-	details := types.NewRUMFavoriteAsset()
-
-	// get the asset list of the account
-	list, err := rc.Store.FindAccountFavoriteAssetList(rc.AccountCtx.Account.ID)
-	if err != nil {
-		return ResolveResponseErr(rc, types.ErrorNotFound("list not found"))
-	}
-
-	// find the asset that we want to add/remove
-	body, err := io.ReadAll(rc.Request.Body)
-	if err != nil {
-		return ResolveResponseErr(rc, types.ErrorUnexpected())
-	}
-
-	err = json.Unmarshal(body, &details)
-	if err != nil {
-		return ResolveResponseErr(rc, types.ErrorUnexpected())
-	}
-
-	asset, err := rc.Store.FindAssetByID(details.AssetID)
-	if err != nil {
-		return ResolveResponseErr(rc, types.ErrorUnexpected())
-	}
-
-	// if id is in list - remove it.
-	RRMOper.AssetID = asset.ID
-	itemExistsInList := false
-	newItemList := []primitive.ObjectID{}
-
-	for _, v := range list.Items {
-		if v == asset.ID {
-			itemExistsInList = true
-		} else {
-			newItemList = append(newItemList, v)
-		}
-	}
-
-	if itemExistsInList {
-		RRMOper.Oper = types.RRMFAOperRemove
-	} else {
-		RRMOper.Oper = types.RRMFAOperAdd
-		// if id not in list -
-		//	if account_id on asset is the called - add it to the list
-		if asset.AccountID == rc.AccountCtx.Account.ID {
-			newItemList = append(newItemList, asset.ID)
-		} else {
-			// if account_id is different, create a new asset for the current account and add it to the list.
-			newAsset := types.CloneAsset(asset, rc.AccountCtx.Account.ID)
-			RRMOper.AssetID = newAsset.ID
-			newAsset.UpdatedAt = &ts
-			newItemList = append(newItemList, newAsset.ID)
-
-			err = rc.Store.SaveNewSingle(newAsset, "asset")
-			if err != nil {
-				return ResolveResponseErr(rc, types.ErrorUnexpected())
-			}
-		}
-	}
-
-	list.Items = newItemList
-	list.UpdatedAt = &ts
-	err = rc.Store.UpdateFavoriteAssetList(list)
-	if err != nil {
-		return ResolveResponseErr(rc, types.ErrorUnexpected())
-	}
-
-	rc.AddToResponseList("details", RRMOper)
-	return ResolveResponse(rc)
 }

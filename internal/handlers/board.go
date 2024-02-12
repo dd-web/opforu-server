@@ -144,12 +144,14 @@ func (bh *BoardHandler) handleNewThread(rc *types.RequestCtx) error {
 	newThreadAssets := []*types.Asset{}
 	newThreadAssetInterfaces := []interface{}{}
 
-	for _, v := range details.Assets {
-		a := types.NewAsset(v.SourceID, rc.AccountCtx.Account.ID)
-		a.FileName = v.FileName
-		a.Description = v.Description
-		a.Tags = v.Tags
-		newThreadAssets = append(newThreadAssets, a)
+	if len(details.Assets) > 0 {
+		for _, v := range details.Assets {
+			a := types.NewAsset(v.SourceID, rc.AccountCtx.Account.ID)
+			a.FileName = v.FileName
+			a.Description = v.Description
+			a.Tags = v.Tags
+			newThreadAssets = append(newThreadAssets, a)
+		}
 	}
 
 	newIdentity := types.NewIdentity()
@@ -165,15 +167,15 @@ func (bh *BoardHandler) handleNewThread(rc *types.RequestCtx) error {
 	thread.Creator = newIdentity.ID
 	thread.Mods = []primitive.ObjectID{newIdentity.ID}
 
-	for _, v := range newThreadAssets {
-		thread.Assets = append(thread.Assets, v.ID)
-		newThreadAssetInterfaces = append(newThreadAssetInterfaces, v)
-	}
-
-	// save & update associated docs
-	err = rc.Store.SaveNewMulti(newThreadAssetInterfaces, "assets")
-	if err != nil {
-		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	if len(details.Assets) > 0 {
+		for _, v := range newThreadAssets {
+			thread.Assets = append(thread.Assets, v.ID)
+			newThreadAssetInterfaces = append(newThreadAssetInterfaces, v)
+		}
+		err = rc.Store.SaveNewMulti(newThreadAssetInterfaces, "assets")
+		if err != nil {
+			return ResolveResponseErr(rc, types.ErrorUnexpected())
+		}
 	}
 
 	err = rc.Store.SaveNewSingle(newIdentity, "identities")

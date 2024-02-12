@@ -20,7 +20,7 @@ func QrStrLookupPosts(sortBy string, sortDir int, limit int) bson.D {
 
 	pipe = append(
 		pipe,
-		QrStrLookupAssets(),
+		QrStrLookupAssets("assets"),
 		QrStrLookupIdentity("creator"),
 		BsonOperator("$addFields", "creator", BsonOperWithArray("$arrayElemAt", []interface{}{"$creator", 0})),
 		BsonOperWithArray("$unset", []interface{}{"thread", "board", "account", "creator._id"}),

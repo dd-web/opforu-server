@@ -22,14 +22,14 @@ var (
 	}
 )
 
-func QrStrLookupAssets() bson.D {
+func QrStrLookupAssets(pk string) bson.D {
 	pipe := bson.A{
 		BsonLookup("asset_sources", "source_id", "_id", "source", bson.D{}, bson.A{}),
 		BsonOperator("$addFields", "source", BsonOperWithArray("$arrayElemAt", []interface{}{"$source", 0})),
 		BsonProjectionMap(ASSET_PUBLIC_PROJECTION),
 		BsonOperWithArray("$unset", []interface{}{"_id"}),
 	}
-	return BsonLookup("assets", "assets", "_id", "assets", bson.D{}, pipe)
+	return BsonLookup("assets", pk, "_id", pk, bson.D{}, pipe)
 }
 
 // Checksum hash collision query - checks source and avatar for given hash using specified method

@@ -62,10 +62,6 @@ type AssetSourceDetails struct {
 type AssetSource struct {
 	ID primitive.ObjectID `json:"_id" bson:"_id"`
 
-	// Details struct {
-	// 	Avatar FileCtx `json:"avatar" bson:"avatar"`
-	// 	Source FileCtx `json:"source" bson:"source"`
-	// }
 	Details *AssetSourceDetails `bson:"details" json:"details"`
 
 	AssetType AssetType            `json:"asset_type" bson:"asset_type"`

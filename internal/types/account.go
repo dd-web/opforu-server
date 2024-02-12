@@ -22,23 +22,6 @@ type Account struct {
 	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
 }
 
-type FavoriteAssetList struct {
-	ID        primitive.ObjectID   `bson:"_id,omitempty" json:"_id"`
-	AccountID primitive.ObjectID   `bson:"account" json:"account"` // account id
-	Items     []primitive.ObjectID `bson:"items" json:"items"`     // asset id's
-
-	CreatedAt *time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt *time.Time `bson:"updated_at" json:"updated_at"`
-	DeletedAt *time.Time `bson:"deleted_at,omitempty" json:"deleted_at,omitempty"`
-}
-
-func (fal *FavoriteAssetList) CLFormat() bson.M {
-	return bson.M{
-		"items":      fal.Items,
-		"updated_at": fal.UpdatedAt,
-	}
-}
-
 type AccountStatus string
 
 const (

@@ -94,12 +94,16 @@ func (th *ThreadHandler) handleThreadReply(rc *types.RequestCtx) error {
 	newPostAssets := []*types.Asset{}
 	newPostAssetInterfaces := []interface{}{}
 
-	for _, v := range details.Assets {
-		a := types.NewAsset(v.SourceID, rc.AccountCtx.Account.ID)
-		a.FileName = v.FileName
-		a.Description = v.Description
-		a.Tags = v.Tags
-		newPostAssets = append(newPostAssets, a)
+	// no idea why this check is necessary but it is
+	// there is otherwise no stack trace information and we regardless receive 200 response? weird.
+	if len(details.Assets) > 0 {
+		for _, v := range details.Assets {
+			a := types.NewAsset(v.SourceID, rc.AccountCtx.Account.ID)
+			a.FileName = v.FileName
+			a.Description = v.Description
+			a.Tags = v.Tags
+			newPostAssets = append(newPostAssets, a)
+		}
 	}
 
 	pparser := types.NewTemplateThreadReply(details.Content)
@@ -118,15 +122,15 @@ func (th *ThreadHandler) handleThreadReply(rc *types.RequestCtx) error {
 	thread.UpdatedAt = &ts
 	board.UpdatedAt = &ts
 
-	for _, v := range newPostAssets {
-		post.Assets = append(post.Assets, v.ID)
-		newPostAssetInterfaces = append(newPostAssetInterfaces, v)
-	}
-
-	// Save & Update associative documents
-	err = rc.Store.SaveNewMulti(newPostAssetInterfaces, "assets")
-	if err != nil {
-		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	if len(details.Assets) > 0 {
+		for _, v := range newPostAssets {
+			post.Assets = append(post.Assets, v.ID)
+			newPostAssetInterfaces = append(newPostAssetInterfaces, v)
+		}
+		err = rc.Store.SaveNewMulti(newPostAssetInterfaces, "assets")
+		if err != nil {
+			return ResolveResponseErr(rc, types.ErrorUnexpected())
+		}
 	}
 
 	err = rc.Store.SaveNewSingle(post, "posts")

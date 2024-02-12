@@ -101,10 +101,6 @@ func (rc *RequestCtx) Finalize() {
 		rc.AddToResponseListCLF("session", rc.AccountCtx.Session)
 	}
 
-	if rc.AccountCtx.FavoriteAssets != nil {
-		rc.AddToResponseListCLF("favorite_assets", rc.AccountCtx.FavoriteAssets)
-	}
-
 	// these are explicity added, shouldn't need to check for nil
 	for _, v := range rc.ResponseList {
 		for key, value := range v {
@@ -161,12 +157,6 @@ func (rc *RequestCtx) ResolveAccountCtx() {
 	rc.AccountCtx.Account = account
 	rc.AccountCtx.Role = account.Role
 
-	favoriteList, err := rc.Store.FindAccountFavoriteAssetList(account.ID)
-	if err != nil {
-		rc.UnresolvedAccount = true
-	}
-
-	rc.AccountCtx.FavoriteAssets = favoriteList
 }
 
 // parse the request and populate each of the contexts with relevant information
@@ -301,11 +291,10 @@ func (p *PageCtx) Update(results int) {
 
 // context of the requesting user. if unable to resolve a user pointers will be nil
 type AccountCtx struct {
-	Session        *Session           `json:"session,omitempty"`
-	Account        *Account           `json:"account,omitempty"`
-	FavoriteAssets *FavoriteAssetList `json:"favorite_assets"`
-	ExpiredSession bool               `json:"expired_session,omitempty"`
-	Role           AccountRole        `json:"-"`
+	Session        *Session    `json:"session,omitempty"`
+	Account        *Account    `json:"account,omitempty"`
+	ExpiredSession bool        `json:"expired_session,omitempty"`
+	Role           AccountRole `json:"-"`
 }
 
 // creates a new user context with default values and a public role

@@ -73,33 +73,3 @@ func NewRUMComment() *RUMComment {
 		MakeAnonymous: false,
 	}
 }
-
-type RUMFavoriteAsset struct {
-	AssetID primitive.ObjectID `json:"asset_id"`
-}
-
-func NewRUMFavoriteAsset() *RUMFavoriteAsset {
-	return &RUMFavoriteAsset{
-		AssetID: primitive.NilObjectID,
-	}
-}
-
-// Request Response Marshaller
-type RRMFAOper string
-
-const (
-	RRMFAOperAdd    RRMFAOper = "add"
-	RRMFAOperRemove RRMFAOper = "remove"
-)
-
-type RRMFavoriteAsset struct {
-	AssetID primitive.ObjectID `json:"asset_id"`
-	Oper    RRMFAOper          `json:"oper"`
-}
-
-func NewRRMFavoriteAsset() *RRMFavoriteAsset {
-	return &RRMFavoriteAsset{
-		AssetID: primitive.NilObjectID,
-		Oper:    RRMFAOperAdd,
-	}
-}

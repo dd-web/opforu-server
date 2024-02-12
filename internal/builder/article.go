@@ -24,7 +24,7 @@ func QrStrLookupArticleList(cfg *types.QueryCtx) bson.A {
 		QrStrLookupArticleAuthor("co_authors"),
 		BsonOperator("$addFields", "co_authors", "$co_authors.author"),
 		BsonD("$unset", "co_authors._id"),
-		QrStrLookupAssets(),
+		QrStrLookupAssets("assets"),
 	}
 }
 
@@ -44,7 +44,7 @@ func QrStrLookupArticle(slug string) bson.A {
 		BsonD("$unset", "co_authors.created_at"),
 		BsonD("$unset", "co_authors.updated_at"),
 		BsonLookup("article_comments", "comments", "_id", "comments", bson.D{}, getCommentPipe()),
-		QrStrLookupAssets(),
+		QrStrLookupAssets("assets"),
 	}
 }
 
@@ -72,6 +72,6 @@ func getCommentPipe() bson.A {
 		BsonD("$unset", "author.created_at"),
 		BsonD("$unset", "author.updated_at"),
 		BsonD("$unset", "author_anonymous"),
-		QrStrLookupAssets(),
+		QrStrLookupAssets("assets"),
 	}
 }

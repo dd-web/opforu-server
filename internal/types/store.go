@@ -403,42 +403,6 @@ func (s *Store) FindAccountFromSession(id string) (*Account, error) {
 	return account, nil
 }
 
-// Find favorite asset list by account id
-// - accepts an objectID of the account
-// - returns a pointer to the list, or an error if one occurs
-func (s *Store) FindAccountFavoriteAssetList(id primitive.ObjectID) (*FavoriteAssetList, error) {
-	collection := s.DB.Collection("favorite_asset_lists")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	list := &FavoriteAssetList{}
-	err := collection.FindOne(ctx, bson.D{{Key: "account", Value: id}}).Decode(&list)
-	if err != nil {
-		return nil, err
-	}
-
-	return list, nil
-}
-
-// Update the provided FavoriteAssetList
-// uses the passed list's id and it's account id to determine which to update and replace old with new
-// - accepts a pointer to a FavoriteAssetList object
-// - returns an error if one occurred, else nil
-func (s *Store) UpdateFavoriteAssetList(list *FavoriteAssetList) error {
-	collection := s.DB.Collection("favorite_asset_lists")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	filter := bson.D{{Key: "_id", Value: list.ID}, {Key: "account", Value: list.AccountID}}
-
-	_, err := collection.ReplaceOne(ctx, filter, list)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 /*******************************************************************************************
  * Session Operations
  *******************************************************************************************/
@@ -533,6 +497,62 @@ func (s *Store) FindAssetByID(id primitive.ObjectID) (*Asset, error) {
 		return nil, err
 	}
 	return result, nil
+}
+
+// find asset source by it's hash (sha256)
+func (s *Store) FindAssetSourceByHash(hash string) (*AssetSource, error) {
+	collection := s.DB.Collection("asset_sources")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result := &AssetSource{
+		ID: primitive.NilObjectID,
+	}
+
+	err := collection.FindOne(ctx, bson.D{{Key: "details.source.hash_sha256", Value: hash}}).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.ID == primitive.NilObjectID {
+		return nil, nil
+	}
+
+	return result, nil
+}
+
+// find all assets with given source id and account id
+func (s *Store) FindAssetsBySourceIDAccountID(source_id, account_id primitive.ObjectID) ([]*Asset, error) {
+	collection := s.DB.Collection("assets")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cursor, err := collection.Find(ctx, bson.D{{Key: "source_id", Value: source_id}, {Key: "account_id", Value: account_id}})
+	if err != nil {
+		return nil, err
+	}
+
+	results := []*Asset{}
+
+	defer func() {
+		cursor.Close(ctx)
+	}()
+
+	for cursor.Next(ctx) {
+		result := &Asset{
+			ID: primitive.NilObjectID,
+		}
+
+		err := cursor.Decode(&result)
+		if err != nil {
+			fmt.Printf("error decoding asset result %+v", err)
+			continue
+		}
+
+		results = append(results, result)
+	}
+
+	return results, nil
 }
 
 /*******************************************************************************************
