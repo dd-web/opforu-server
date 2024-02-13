@@ -1,8 +1,99 @@
 package types
 
 import (
+	"bytes"
+	"fmt"
 	"regexp"
+	"text/template"
 )
+
+type TemplateStore struct {
+	PostLinks map[string]*template.Template
+}
+
+func NewTemplateStore() *TemplateStore {
+	t := &TemplateStore{
+		PostLinks: map[string]*template.Template{},
+	}
+	t.Hydrate()
+	return t
+}
+
+func (ts *TemplateStore) Hydrate() {
+	postLinkKinds := []PostLink{
+		PostInternalThread,
+		ThreadInternalBoard,
+		PostInternalBoard,
+		ThreadExternalBoard,
+		PostExternalBoard,
+	}
+
+	for _, v := range postLinkKinds {
+		ts.PostLinks[string(v)] = template.New(fmt.Sprintf(`<button class="%s {{ .ClassList }}">{{ .Content }}</button>`, string(v)))
+	}
+
+}
+
+type PostLink string
+
+const (
+	PostInternalThread  PostLink = "post-internal-thread"
+	ThreadInternalBoard PostLink = "thread-internal-board"
+	PostInternalBoard   PostLink = "post-internal-board"
+	ThreadExternalBoard PostLink = "thread-external-board"
+	PostExternalBoard   PostLink = "post-external-board"
+)
+
+type PostLinkTemplate struct {
+	Kind       PostLink
+	PostNumber int    // referenced post
+	ThreadSlug string // referenced thread
+	BoardShort string // referenced board
+	ClassList  string
+	Content    string
+}
+
+func (plt *PostLinkTemplate) InnerContent() string {
+	switch plt.Kind {
+	case PostInternalThread:
+		return fmt.Sprintf("%d", plt.PostNumber)
+	case ThreadInternalBoard:
+		return plt.ThreadSlug
+	case PostInternalBoard:
+		return fmt.Sprintf("%s/%d", plt.ThreadSlug, plt.PostNumber)
+	case ThreadExternalBoard:
+		return fmt.Sprintf("%s/%s", plt.BoardShort, plt.ThreadSlug)
+	case PostExternalBoard:
+		return fmt.Sprintf("%s/%s/%d", plt.BoardShort, plt.ThreadSlug, plt.PostNumber)
+	default:
+		return "unknown link"
+	}
+}
+
+func NewPostLinkTemplate(kind PostLink, post int, slug, short string) *PostLinkTemplate {
+	return &PostLinkTemplate{
+		Kind:       kind,
+		PostNumber: post,
+		ThreadSlug: slug,
+		BoardShort: short,
+		ClassList:  string(kind),
+	}
+}
+
+func (plt *PostLinkTemplate) Parse(ts *TemplateStore) error {
+	t, ok := ts.PostLinks[string(plt.Kind)]
+	if !ok {
+		return fmt.Errorf("unresolvable link type %s", plt.Kind)
+	}
+	buf := new(bytes.Buffer)
+	err := t.Execute(buf, plt)
+	if err != nil {
+		return err
+	}
+	plt.Content = buf.String()
+
+	return nil
+}
 
 type InternalTemplate interface {
 	HTML() string
