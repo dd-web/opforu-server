@@ -1,0 +1,6 @@
+this test is for all types of links in a single file.
+here is <button class="post-internal-thread post-link">772</button> post internal thread. and <button class="thread-internal-board post-link">82jrd92kda</button> thread internal board.
+
+and here is post internal board <button class="post-internal-board post-link">9k2ad02nzbf/812</button> thats cool. and then we have
+thread external board <button class="thread-external-board post-link">gen/02nd2adc2dka</button> and lastly <button class="post-external-board post-link">math/2jsflg2azc/112</button> is
+post external board. all link types within one post.

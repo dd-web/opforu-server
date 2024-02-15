@@ -10,8 +10,19 @@ import (
 )
 
 type innerTemplate struct {
-	Content string
+	Content   string
+	ClassList string
 }
+
+var (
+	PostLinkPatterns = map[string]*regexp.Regexp{
+		"post-internal-thread":  regexp.MustCompile(`(?m)>>([[:digit:]]{1,9})[[:blank:]]`),                                        // 1 = post_num
+		"thread-internal-board": regexp.MustCompile(`(?m)>>([[:alnum:]]{8,12})[[:blank:]]`),                                       // 1 = threadslug
+		"post-internal-board":   regexp.MustCompile(`(?m)>>([[:alnum:]]{8,12})/([[:digit:]]{1,9})[[:blank:]]`),                    // 1 = threadslug, 2 = post_num
+		"thread-external-board": regexp.MustCompile(`(?m)>>([[:alpha:]]{2,5})/([[:alnum:]]{8,12})[[:blank:]]`),                    // 1 = board short, 2 = threadslug
+		"post-external-board":   regexp.MustCompile(`(?m)>>([[:alpha:]]{2,5})/([[:alnum:]]{8,12})/([[:digit:]]{1,9})[[:blank:]]`), // 1 = board short, 2 = threadslug, 3 = post_num
+	}
+)
 
 type TemplateStore struct {
 	// html templates replace all html character codes, our case is iterative which means we must use text templates
@@ -20,6 +31,7 @@ type TemplateStore struct {
 	HtmlReplTempl *template.Template
 	PostLinks     map[string]*texttempl.Template
 	Text          map[string]*texttempl.Template
+	PostLinkKinds []PostLink
 }
 
 func NewTemplateStore() *TemplateStore {
@@ -33,7 +45,7 @@ func NewTemplateStore() *TemplateStore {
 }
 
 func (ts *TemplateStore) Hydrate() {
-	postLinkKinds := []PostLink{
+	ts.PostLinkKinds = []PostLink{
 		PostInternalThread,
 		ThreadInternalBoard,
 		PostInternalBoard,
@@ -41,7 +53,7 @@ func (ts *TemplateStore) Hydrate() {
 		PostExternalBoard,
 	}
 
-	for _, v := range postLinkKinds {
+	for _, v := range ts.PostLinkKinds {
 		tmpl, err := texttempl.New(string(v)).Parse(fmt.Sprintf(`<button class="%s {{ .ClassList }}">{{ .Content }}</button>`, string(v)))
 		if err != nil {
 			panic(err)
@@ -111,19 +123,49 @@ func NewPostLinkTemplate(kind PostLink, post int, slug, short string) *PostLinkT
 	return pl
 }
 
-func (plt *PostLinkTemplate) Parse(ts *TemplateStore) error {
-	t, ok := ts.PostLinks[string(plt.Kind)]
-	if !ok {
-		return fmt.Errorf("unresolvable link type %s", plt.Kind)
-	}
-	buf := new(bytes.Buffer)
-	err := t.Execute(buf, plt)
-	if err != nil {
-		return err
-	}
-	plt.Content = buf.String()
+// parses entire input's post links, all instances will be replaced
+func (ts *TemplateStore) ParsePostLinks(text string) (string, error) {
+	parsed := text
 
-	return nil
+	for _, postlinktype := range ts.PostLinkKinds {
+		tmpl, ok := ts.PostLinks[string(postlinktype)]
+		if !ok {
+			return "", fmt.Errorf("unresolvable template: %s", string(postlinktype))
+		}
+
+		rxp, ok := PostLinkPatterns[string(postlinktype)]
+		if !ok {
+			return "", fmt.Errorf("unresolvable pattern match: %s", string(postlinktype))
+		}
+
+		matchList := map[string]string{}
+
+		for _, match := range rxp.FindAllString(text, -1) {
+			innert := &innerTemplate{
+				Content:   "",
+				ClassList: "post-link",
+			}
+			buf := new(bytes.Buffer)
+
+			content := strings.ReplaceAll(match, ">", "")
+			content = strings.ReplaceAll(content, " ", "")
+			innert.Content = content
+
+			if innert.Content != "" {
+				err := tmpl.Execute(buf, innert)
+				if err != nil {
+					return "", err
+				}
+				matchList[match] = buf.String() + " "
+			}
+		}
+
+		for k, v := range matchList {
+			parsed = strings.ReplaceAll(parsed, k, v)
+		}
+	}
+
+	return parsed, nil
 }
 
 // uses go's template system to sanitize html into their character codes utf-8 (js uses utf-16)
