@@ -16,11 +16,11 @@ type innerTemplate struct {
 
 var (
 	PostLinkPatterns = map[string]*regexp.Regexp{
-		"post-internal-thread":  regexp.MustCompile(`(?m)>>([[:digit:]]{1,9})[[:blank:]]`),                                        // 1 = post_num
-		"thread-internal-board": regexp.MustCompile(`(?m)>>([[:alnum:]]{8,12})[[:blank:]]`),                                       // 1 = threadslug
-		"post-internal-board":   regexp.MustCompile(`(?m)>>([[:alnum:]]{8,12})/([[:digit:]]{1,9})[[:blank:]]`),                    // 1 = threadslug, 2 = post_num
-		"thread-external-board": regexp.MustCompile(`(?m)>>([[:alpha:]]{2,5})/([[:alnum:]]{8,12})[[:blank:]]`),                    // 1 = board short, 2 = threadslug
-		"post-external-board":   regexp.MustCompile(`(?m)>>([[:alpha:]]{2,5})/([[:alnum:]]{8,12})/([[:digit:]]{1,9})[[:blank:]]`), // 1 = board short, 2 = threadslug, 3 = post_num
+		"post-internal-thread":  regexp.MustCompile(`(?m)&gt;&gt;([[:digit:]]{1,9})[[:blank:]]`),                                        // 1 = post_num
+		"thread-internal-board": regexp.MustCompile(`(?m)&gt;&gt;([[:alnum:]]{8,12})[[:blank:]]`),                                       // 1 = threadslug
+		"post-internal-board":   regexp.MustCompile(`(?m)&gt;&gt;([[:alnum:]]{8,12})/([[:digit:]]{1,9})[[:blank:]]`),                    // 1 = threadslug, 2 = post_num
+		"thread-external-board": regexp.MustCompile(`(?m)&gt;&gt;([[:alpha:]]{2,5})/([[:alnum:]]{8,12})[[:blank:]]`),                    // 1 = board short, 2 = threadslug
+		"post-external-board":   regexp.MustCompile(`(?m)&gt;&gt;([[:alpha:]]{2,5})/([[:alnum:]]{8,12})/([[:digit:]]{1,9})[[:blank:]]`), // 1 = board short, 2 = threadslug, 3 = post_num
 	}
 )
 
@@ -85,44 +85,6 @@ const (
 	PostExternalBoard   PostLink = "post-external-board"
 )
 
-type PostLinkTemplate struct {
-	Kind       PostLink
-	PostNumber int    // referenced post
-	ThreadSlug string // referenced thread
-	BoardShort string // referenced board
-	ClassList  string
-	Content    string
-}
-
-func (plt *PostLinkTemplate) InnerContent() string {
-	switch plt.Kind {
-	case PostInternalThread:
-		return fmt.Sprintf("%d", plt.PostNumber)
-	case ThreadInternalBoard:
-		return plt.ThreadSlug
-	case PostInternalBoard:
-		return fmt.Sprintf("%s/%d", plt.ThreadSlug, plt.PostNumber)
-	case ThreadExternalBoard:
-		return fmt.Sprintf("%s/%s", plt.BoardShort, plt.ThreadSlug)
-	case PostExternalBoard:
-		return fmt.Sprintf("%s/%s/%d", plt.BoardShort, plt.ThreadSlug, plt.PostNumber)
-	default:
-		return "unknown link"
-	}
-}
-
-func NewPostLinkTemplate(kind PostLink, post int, slug, short string) *PostLinkTemplate {
-	pl := &PostLinkTemplate{
-		Kind:       kind,
-		PostNumber: post,
-		ThreadSlug: slug,
-		BoardShort: short,
-		ClassList:  "post-link",
-	}
-	pl.Content = pl.InnerContent()
-	return pl
-}
-
 // parses entire input's post links, all instances will be replaced
 func (ts *TemplateStore) ParsePostLinks(text string) (string, error) {
 	parsed := text
@@ -147,7 +109,7 @@ func (ts *TemplateStore) ParsePostLinks(text string) (string, error) {
 			}
 			buf := new(bytes.Buffer)
 
-			content := strings.ReplaceAll(match, ">", "")
+			content := strings.ReplaceAll(match, "&gt;", "")
 			content = strings.ReplaceAll(content, " ", "")
 			innert.Content = content
 
@@ -216,93 +178,21 @@ func (ts *TemplateStore) WrapParagraphs(text string) (string, error) {
 	return str, nil
 }
 
-// to be removed - everything below this line - after more robust template implementation complete
-type TRegSub struct {
-	Reg *regexp.Regexp
-	Sub string
-}
-
-var (
-	rxp_post_internal_thread *TRegSub = &TRegSub{
-		Reg: regexp.MustCompile(`(?m)>>(\d+)\s`),
-		Sub: `<button class="post-internal-thread post-link">${1}</button>`,
+func (ts *TemplateStore) Parse(text string) (string, error) {
+	str, err := ts.ReplaceChars(text)
+	if err != nil {
+		return "", err
 	}
 
-	rxp_thread_internal_board *TRegSub = &TRegSub{
-		Reg: regexp.MustCompile(`(?m)>>([[:alnum:]]+[[:alpha:]]+[[:alnum:]]+)\s`),
-		Sub: `<button class="thread-internal-board post-link">${1}</button>`,
+	paras, err := ts.WrapParagraphs(str)
+	if err != nil {
+		return "", err
 	}
 
-	rxp_post_internal_board *TRegSub = &TRegSub{
-		Reg: regexp.MustCompile(`(?m)>>([[:alnum:]]+[[:alpha:]]+[[:alnum:]]+\/\d+)\s`),
-		Sub: `<button class="post-internal-board post-link">${1}</button>`,
+	postlinks, err := ts.ParsePostLinks(paras)
+	if err != nil {
+		return "", err
 	}
 
-	rxp_thread_external_board *TRegSub = &TRegSub{
-		Reg: regexp.MustCompile(`(?m)>>([[:alpha:]]+\/[[:alnum:]]+[[:alpha:]]+[[:alnum:]]+)\s`),
-		Sub: `<button class="thread-external-board post-link">${1}</button>`,
-	}
-
-	rxp_post_external_board *TRegSub = &TRegSub{
-		Reg: regexp.MustCompile(`(?m)>>([[:alpha:]]+\/[[:alnum:]]+[[:alpha:]]+[[:alnum:]]+\/\d+)\s`),
-		Sub: `<button class="post-external-board post-link">${1}</button>`,
-	}
-
-	// whitespace reduction on beginning of strings
-	rxp_ws_start *TRegSub = &TRegSub{
-		Reg: regexp.MustCompile(`(?m)^[[:blank:]]{1,}`),
-		Sub: "",
-	}
-
-	// whitespace preservation between lines
-	rxp_ws_mid *TRegSub = &TRegSub{
-		Reg: regexp.MustCompile(`(?m)[\n\r]{3,}`),
-		Sub: "\n",
-	}
-
-	// whitespace reduction on end of strings
-	rxp_ws_end *TRegSub = &TRegSub{
-		Reg: regexp.MustCompile(`(?m)[[:blank:]]{1,}$`),
-		Sub: "",
-	}
-
-	// template regex quotes
-	rxp_quote *TRegSub = &TRegSub{
-		Reg: regexp.MustCompile(`(?m)^>([^>].+)$`),
-		Sub: `<blockquote class="reply-quote">${1}</blockquote>`,
-	}
-)
-
-// Template Thread Reply
-// used as a wrapper for the entirety of the reply contents, including furthur nested templates
-type TemplateThreadReply struct {
-	Content string
-	RegOps  []*TRegSub
-}
-
-func NewTemplateThreadReply(content string) *TemplateThreadReply {
-	return &TemplateThreadReply{
-		Content: content,
-		RegOps: []*TRegSub{
-			rxp_ws_start,
-			rxp_ws_end,
-			rxp_ws_mid,
-			rxp_post_internal_thread,
-			rxp_thread_internal_board,
-			rxp_post_internal_board,
-			rxp_thread_external_board,
-			rxp_post_external_board,
-			rxp_quote,
-		},
-	}
-}
-
-func (ttr *TemplateThreadReply) Parse() string {
-	str := ttr.Content
-
-	for _, v := range ttr.RegOps {
-		str = v.Reg.ReplaceAllString(str, v.Sub)
-	}
-
-	return str
+	return postlinks, nil
 }

@@ -106,8 +106,11 @@ func (th *ThreadHandler) handleThreadReply(rc *types.RequestCtx) error {
 		}
 	}
 
-	pparser := types.NewTemplateThreadReply(details.Content)
-	str := pparser.Parse()
+	tstore := types.NewTemplateStore()
+	str, err := tstore.Parse(details.Content)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
 
 	post := types.NewPost()
 
