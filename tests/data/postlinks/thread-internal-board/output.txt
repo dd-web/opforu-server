@@ -1,0 +1,1 @@
+some text and <button class="thread-internal-board post-link">5kdz2hd9ha</button> some more after

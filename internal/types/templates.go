@@ -14,16 +14,19 @@ type innerTemplate struct {
 }
 
 type TemplateStore struct {
-	PostLinks map[string]*template.Template
-	HTML      map[string]*template.Template
-	Text      map[string]*texttempl.Template
+	// html templates replace all html character codes, our case is iterative which means we must use text templates
+	// for any html we wish to inject because our previous iterations become invalid html. This is used to invalidate
+	// any html a user may have submitted. Use it once and once only against any submitted content. (sanitize first)
+	HtmlReplTempl *template.Template
+	PostLinks     map[string]*texttempl.Template
+	Text          map[string]*texttempl.Template
 }
 
 func NewTemplateStore() *TemplateStore {
 	t := &TemplateStore{
-		PostLinks: map[string]*template.Template{},
-		HTML:      map[string]*template.Template{},
-		Text:      map[string]*texttempl.Template{},
+		HtmlReplTempl: &template.Template{},
+		PostLinks:     map[string]*texttempl.Template{},
+		Text:          map[string]*texttempl.Template{},
 	}
 	t.Hydrate()
 	return t
@@ -39,7 +42,7 @@ func (ts *TemplateStore) Hydrate() {
 	}
 
 	for _, v := range postLinkKinds {
-		tmpl, err := template.New(string(v)).Parse(fmt.Sprintf(`<button class="%s {{ .ClassList }}">{{ .Content }}</button>`, string(v)))
+		tmpl, err := texttempl.New(string(v)).Parse(fmt.Sprintf(`<button class="%s {{ .ClassList }}">{{ .Content }}</button>`, string(v)))
 		if err != nil {
 			panic(err)
 		}
@@ -50,7 +53,7 @@ func (ts *TemplateStore) Hydrate() {
 	if err != nil {
 		panic(err)
 	}
-	ts.HTML["wrapper"] = replacement
+	ts.HtmlReplTempl = replacement
 
 	paragraphs, err := texttempl.New("paragraph").Parse("<p>{{ .Content }}</p>")
 	if err != nil {
@@ -126,8 +129,8 @@ func (plt *PostLinkTemplate) Parse(ts *TemplateStore) error {
 // uses go's template system to sanitize html into their character codes utf-8 (js uses utf-16)
 // raw text should already be sanitized for destructive content earlier
 func (ts *TemplateStore) ReplaceChars(text string) (string, error) {
-	t, ok := ts.HTML["wrapper"]
-	if !ok {
+	t := ts.HtmlReplTempl
+	if t == nil {
 		return "", fmt.Errorf("unresolvable template %s", "wrapper")
 	}
 

@@ -1,0 +1,1 @@
+some text and <button class="post-internal-thread post-link">882</button> some more after

@@ -1,0 +1,1 @@
+some text and <button class="post-external-board post-link">gen/2md0ajfla1/421</button> some more after
