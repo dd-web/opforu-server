@@ -1,0 +1,8 @@
+hey here's another example of some input here demonstrating how quotes work. >this won't be a quote.
+>this however, will be. it should go on until a newline followed by a newline is observed.
+
+the break demonstrates we're done with the quote. >again this won't be quoted.
+>and this will be.
+as well as this.
+
+but not this.

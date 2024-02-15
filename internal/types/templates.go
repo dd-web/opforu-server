@@ -3,17 +3,27 @@ package types
 import (
 	"bytes"
 	"fmt"
+	"html/template"
 	"regexp"
-	"text/template"
+	"strings"
+	texttempl "text/template"
 )
+
+type innerTemplate struct {
+	Content string
+}
 
 type TemplateStore struct {
 	PostLinks map[string]*template.Template
+	HTML      map[string]*template.Template
+	Text      map[string]*texttempl.Template
 }
 
 func NewTemplateStore() *TemplateStore {
 	t := &TemplateStore{
 		PostLinks: map[string]*template.Template{},
+		HTML:      map[string]*template.Template{},
+		Text:      map[string]*texttempl.Template{},
 	}
 	t.Hydrate()
 	return t
@@ -29,8 +39,24 @@ func (ts *TemplateStore) Hydrate() {
 	}
 
 	for _, v := range postLinkKinds {
-		ts.PostLinks[string(v)] = template.New(fmt.Sprintf(`<button class="%s {{ .ClassList }}">{{ .Content }}</button>`, string(v)))
+		tmpl, err := template.New(string(v)).Parse(fmt.Sprintf(`<button class="%s {{ .ClassList }}">{{ .Content }}</button>`, string(v)))
+		if err != nil {
+			panic(err)
+		}
+		ts.PostLinks[string(v)] = tmpl
 	}
+
+	replacement, err := template.New("wrapper").Parse("{{ .Content }}")
+	if err != nil {
+		panic(err)
+	}
+	ts.HTML["wrapper"] = replacement
+
+	paragraphs, err := texttempl.New("paragraph").Parse("<p>{{ .Content }}</p>")
+	if err != nil {
+		panic(err)
+	}
+	ts.Text["paragraph"] = paragraphs
 
 }
 
@@ -71,13 +97,15 @@ func (plt *PostLinkTemplate) InnerContent() string {
 }
 
 func NewPostLinkTemplate(kind PostLink, post int, slug, short string) *PostLinkTemplate {
-	return &PostLinkTemplate{
+	pl := &PostLinkTemplate{
 		Kind:       kind,
 		PostNumber: post,
 		ThreadSlug: slug,
 		BoardShort: short,
-		ClassList:  string(kind),
+		ClassList:  "post-link",
 	}
+	pl.Content = pl.InnerContent()
+	return pl
 }
 
 func (plt *PostLinkTemplate) Parse(ts *TemplateStore) error {
@@ -95,10 +123,55 @@ func (plt *PostLinkTemplate) Parse(ts *TemplateStore) error {
 	return nil
 }
 
-type InternalTemplate interface {
-	HTML() string
+// uses go's template system to sanitize html into their character codes utf-8 (js uses utf-16)
+// raw text should already be sanitized for destructive content earlier
+func (ts *TemplateStore) ReplaceChars(text string) (string, error) {
+	t, ok := ts.HTML["wrapper"]
+	if !ok {
+		return "", fmt.Errorf("unresolvable template %s", "wrapper")
+	}
+
+	innert := &innerTemplate{
+		Content: text,
+	}
+
+	buf := new(bytes.Buffer)
+	err := t.Execute(buf, innert)
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }
 
+func (ts *TemplateStore) WrapParagraphs(text string) (string, error) {
+	t, ok := ts.Text["paragraph"]
+	if !ok {
+		return "", fmt.Errorf("unresolvable template %s", "paragraph")
+	}
+
+	str := ""
+
+	splits := strings.Split(text, "\n\n")
+	for i, v := range splits {
+		ic := &innerTemplate{
+			Content: v,
+		}
+		buf := new(bytes.Buffer)
+		err := t.Execute(buf, ic)
+		if err != nil {
+			return "", err
+		}
+		if i > 0 {
+			str = str + "\n"
+		}
+		str = str + buf.String()
+	}
+
+	return str, nil
+}
+
+// to be removed - everything below this line - after more robust template implementation complete
 type TRegSub struct {
 	Reg *regexp.Regexp
 	Sub string
