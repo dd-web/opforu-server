@@ -24,37 +24,61 @@ type test struct {
 	fn    func(string) (string, error)
 }
 
-func TestHTMLWrapper(t *testing.T) {
+func TestParagraphs(t *testing.T) {
+	testName := "Paragraph wrapping"
+	tstore := types.NewTemplateStore()
+	ptest, err := newTest("template parser - "+testName, paraIn, paraOut, tstore.WrapParagraphs)
+	if err != nil {
+		t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
+	}
+
+	got, err := ptest.fn(ptest.input)
+	if err != nil {
+		t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
+	}
+
+	if !reflect.DeepEqual(ptest.want, got) {
+		t.Fatalf("Test %s failed \n want:\n%+v\n\n got:\n%+v\n", testName, ptest.want, got)
+	}
+}
+
+func TestUTF8Replacement(t *testing.T) {
+	testName := "UTF-8 char code replacement"
+	tstore := types.NewTemplateStore()
+
+	repltest, err := newTest("template parser - "+testName, replcharIn, replcharOut, tstore.ReplaceChars)
+	if err != nil {
+		t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
+	}
+
+	got, err := repltest.fn(repltest.input)
+	if err != nil {
+		t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
+	}
+
+	if !reflect.DeepEqual(repltest.want, got) {
+		t.Fatalf("Test %s failed \n want:\n%+v\n\n got:\n%+v\n", testName, repltest.want, got)
+	}
+}
+
+func TestPostLinks(t *testing.T) {
 	tstore := types.NewTemplateStore()
 	tests := []*test{}
 
-	// utf-16 -> utf-8 & html char code replacement
-	wrapTest, err := newTest("html wrap - character replacement", replcharIn, replcharOut, tstore.ReplaceChars)
-	if err != nil {
-		panic(err)
-	}
-	tests = append(tests, wrapTest)
-
-	// wraps into <p> tags
-	paragraphs, err := newTest("html wrap - paragraph wrapping", paraIn, paraOut, tstore.WrapParagraphs)
-	if err != nil {
-		panic(err)
-	}
-	tests = append(tests, paragraphs)
-
-	// test all types of post links
+	// individual post links by themselves
 	for _, v := range tstore.PostLinkKinds {
+		testName := fmt.Sprintf("Post Link - %s", string(v))
 		plin := postLinkPath + string(v) + "/input.txt"
 		plout := postLinkPath + string(v) + "/output.txt"
 
-		pltest, err := newTest(fmt.Sprintf("post link - %s", string(v)), plin, plout, tstore.ParsePostLinks)
+		pltest, err := newTest("template parser - "+testName, plin, plout, tstore.ParsePostLinks)
 		if err != nil {
-			panic(err)
+			t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
 		}
 		tests = append(tests, pltest)
 	}
 
-	// test all post link types in the same input
+	// a single input with every type of post link there is
 	allpl, err := newTest("post link - all", postLinkPath+"all/input.txt", postLinkPath+"all/output.txt", tstore.ParsePostLinks)
 	if err != nil {
 		panic(err)
@@ -64,11 +88,11 @@ func TestHTMLWrapper(t *testing.T) {
 	for _, testcase := range tests {
 		got, err := testcase.fn(testcase.input)
 		if err != nil {
-			t.Fatalf("Test case %s encountered an error:\n%+v", testcase.name, err)
+			t.Fatalf("Test %s failed, err wasn't nil: %+v", testcase.name, err)
 		}
 
 		if !reflect.DeepEqual(testcase.want, got) {
-			t.Fatalf("%v Failed:\ngot:\n%+v\n\nwant:\n%+v\n\n", testcase.name, got, testcase.want)
+			t.Fatalf("Test %s failed \n want:\n%+v\n\n got:\n%+v\n", testcase.name, testcase.want, got)
 		}
 	}
 }
