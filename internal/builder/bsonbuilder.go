@@ -39,7 +39,7 @@ func BsonD(k string, v any) bson.D {
 
 // Creates a bson.D including the given key/value pair map as bson.E values
 func ComposeBsonD[T comparable](vals map[string]T) bson.D {
-	var d bson.D
+	d := bson.D{}
 	for k, v := range vals {
 		d = append(d, BsonE(k, v))
 	}
@@ -48,34 +48,31 @@ func ComposeBsonD[T comparable](vals map[string]T) bson.D {
 
 // Creates a $lookup bson obj with given parameters
 func BsonLookup(col, pk, fk, as string, let bson.D, pipe bson.A) bson.D {
-	lookupVal := ComposeBsonD(map[string]any{
+	return BsonD("$lookup", ComposeBsonD[any](map[string]any{
 		"from":         col,
 		"localField":   pk,
 		"foreignField": fk,
 		"let":          let,
 		"pipeline":     pipe,
 		"as":           as,
-	})
-
-	return bson.D{{
-		Key:   "$lookup",
-		Value: lookupVal,
-	}}
+	}))
 }
 
-// Creates a $project bson obj with the given values as fields to include or exclude
-// ie: {"name": 1, "age": 1} would pass ["name", "age"], 1 to include those fields or -1 to exclude
-func BsonProjection(keys []string, val int) bson.D {
+type BSONProjectValue int
+
+const (
+	BSONProjectInclude BSONProjectValue = 1
+	BSONProjectExclude BSONProjectValue = -1
+)
+
+// Creates a bson projection with keys either included or excluded
+// with inclusion, exclusions are explicit. the inverse is true of exclusions
+func BsonProjection(keys []string, val BSONProjectValue) bson.D {
 	valM := make(map[string]any)
 	for _, v := range keys {
 		valM[v] = val
 	}
-	projectVal := ComposeBsonD(valM)
-
-	return bson.D{{
-		Key:   "$project",
-		Value: projectVal,
-	}}
+	return BsonD("$project", ComposeBsonD[any](valM))
 }
 
 // creates a projection map from a map[string]T - for more specific control over the projection
@@ -84,20 +81,15 @@ func BsonProjectionMap[T comparable](vals map[string]T) bson.D {
 	for k, v := range vals {
 		pjmap[k] = v
 	}
-	projection := ComposeBsonD(pjmap)
-
-	return bson.D{{
-		Key:   "$project",
-		Value: projection,
-	}}
+	return BsonD("$project", ComposeBsonD[T](pjmap))
 }
 
-// returns a full bson.D pipeline object for a $match or other operators
+// creates bson for pipeline operators
 func BsonOperator(op string, k string, v any) bson.D {
 	return BsonD(op, BsonD(k, v))
 }
 
-// same as BsonOperator but for operators that take an array instead of k/v pair
+// same as BsonOperator but for operators that take an array instead of bson
 func BsonOperWithArray(op string, v []any) bson.D {
 	return BsonD(op, BsonA(v))
 }
@@ -116,11 +108,10 @@ func StartPaginatedPipe(mkey string, mval primitive.ObjectID, cfg *types.QueryCt
 		sort = "updated_at"
 	}
 
-	return bson.A{
+	return BsonA([]any{
 		match,
 		BsonOperator("$sort", sort, cfg.Order),
 		BsonD("$skip", cfg.Skip),
 		BsonD("$limit", cfg.Limit),
-	}, nil
-
+	}), nil
 }
