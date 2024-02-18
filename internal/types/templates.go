@@ -22,6 +22,7 @@ var (
 		"thread-external-board": regexp.MustCompile(`(?m)&gt;&gt;([[:alpha:]]{2,5})/([[:alnum:]]{8,12})[[:blank:]]`),                    // 1 = board short, 2 = threadslug
 		"post-external-board":   regexp.MustCompile(`(?m)&gt;&gt;([[:alpha:]]{2,5})/([[:alnum:]]{8,12})/([[:digit:]]{1,9})[[:blank:]]`), // 1 = board short, 2 = threadslug, 3 = post_num
 	}
+	NewLineFeedLimit = regexp.MustCompile(`(?m)[[:cntrl:]]{2,}`)
 )
 
 type TemplateStore struct {
@@ -54,24 +55,30 @@ func (ts *TemplateStore) Hydrate() {
 	}
 
 	for _, v := range ts.PostLinkKinds {
-		tmpl, err := texttempl.New(string(v)).Parse(fmt.Sprintf(`<button class="%s {{ .ClassList }}">{{ .Content }}</button>`, string(v)))
+		tmpl, err := texttempl.New(string(v)).Parse(`<button class="{{ .ClassList }}">{{ .Content }}</button>`)
 		if err != nil {
 			panic(err)
 		}
-		ts.PostLinks[string(v)] = tmpl
+		ts.PostLinks[string(v)] = tmpl // (v) post link
 	}
 
-	replacement, err := template.New("wrapper").Parse("{{ .Content }}")
+	replacement, err := template.New("utf-8-replace").Parse("{{ .Content }}")
 	if err != nil {
 		panic(err)
 	}
-	ts.HtmlReplTempl = replacement
+	ts.HtmlReplTempl = replacement // utf-8 char code replacements
 
 	paragraphs, err := texttempl.New("paragraph").Parse("<p>{{ .Content }}</p>")
 	if err != nil {
 		panic(err)
 	}
-	ts.Text["paragraph"] = paragraphs
+	ts.Text["paragraph"] = paragraphs // <p> tag wrapper
+
+	wrapper, err := texttempl.New("wrapper").Parse(`<div class="{{ .ClassList }}">{{ .Content }}</div>`)
+	if err != nil {
+		panic(err)
+	}
+	ts.Text["wrapper"] = wrapper // <div> wrapper
 
 }
 
@@ -100,12 +107,12 @@ func (ts *TemplateStore) ParsePostLinks(text string) (string, error) {
 			return "", fmt.Errorf("unresolvable pattern match: %s", string(postlinktype))
 		}
 
-		matchList := map[string]string{}
+		matchList := map[string]string{} // map instead of array is to proactively prevent subtle bug
 
 		for _, match := range rxp.FindAllString(text, -1) {
 			innert := &innerTemplate{
 				Content:   "",
-				ClassList: "post-link",
+				ClassList: fmt.Sprintf("%s post-link", string(postlinktype)),
 			}
 			buf := new(bytes.Buffer)
 
@@ -151,33 +158,59 @@ func (ts *TemplateStore) ReplaceChars(text string) (string, error) {
 	return buf.String(), nil
 }
 
+// wraps whitespace deliminated text with paragraph tags
 func (ts *TemplateStore) WrapParagraphs(text string) (string, error) {
 	t, ok := ts.Text["paragraph"]
 	if !ok {
 		return "", fmt.Errorf("unresolvable template %s", "paragraph")
 	}
 
-	str := ""
-
-	splits := strings.Split(text, "\n\n")
-	for i, v := range splits {
-		ic := &innerTemplate{
-			Content: v,
-		}
-		buf := new(bytes.Buffer)
-		err := t.Execute(buf, ic)
-		if err != nil {
-			return "", err
-		}
-		if i > 0 {
-			str = str + "\n"
-		}
-		str = str + buf.String()
+	strRepl := text
+	for _, match := range NewLineFeedLimit.FindAllString(text, -1) {
+		strRepl = strings.ReplaceAll(strRepl, match, "<br>")
 	}
 
-	return str, nil
+	matchSplit := strings.Split(strRepl, "<br>")
+	finished := ""
+
+	for _, v := range matchSplit {
+		innert := &innerTemplate{
+			Content: v,
+		}
+		if v != "" {
+			buf := new(bytes.Buffer)
+			err := t.Execute(buf, innert)
+			if err != nil {
+				return "", err
+			}
+			finished = finished + buf.String()
+
+		}
+	}
+	return finished, nil
 }
 
+func (ts *TemplateStore) WrapContent(text string) (string, error) {
+	t, ok := ts.Text["wrapper"]
+	if !ok {
+		return "", fmt.Errorf("unresolvable template %s", "wrapper")
+	}
+
+	ic := &innerTemplate{
+		Content:   text,
+		ClassList: "content-body",
+	}
+
+	buf := new(bytes.Buffer)
+	err := t.Execute(buf, ic)
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
+}
+
+// parses user content to generate an html output
 func (ts *TemplateStore) Parse(text string) (string, error) {
 	str, err := ts.ReplaceChars(text)
 	if err != nil {
@@ -194,5 +227,10 @@ func (ts *TemplateStore) Parse(text string) (string, error) {
 		return "", err
 	}
 
-	return postlinks, nil
+	wrapped, err := ts.WrapContent(postlinks)
+	if err != nil {
+		return "", err
+	}
+
+	return wrapped, nil
 }

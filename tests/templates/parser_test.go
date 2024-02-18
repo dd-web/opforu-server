@@ -10,10 +10,15 @@ import (
 )
 
 var (
-	replcharIn   = "../data/replacechars/input.txt"
-	replcharOut  = "../data/replacechars/output.txt"
-	paraIn       = "../data/paragraphs/input.txt"
-	paraOut      = "../data/paragraphs/output.txt"
+	replcharIn  = "../data/replacechars/input.txt"
+	replcharOut = "../data/replacechars/output.txt"
+
+	paraIn  = "../data/paragraphs/input.txt"
+	paraOut = "../data/paragraphs/output.txt"
+
+	wrapIn  = "../data/wrapper/input.txt"
+	wrapOut = "../data/wrapper/output.txt"
+
 	postLinkPath = "../data/postlinks/"
 )
 
@@ -25,9 +30,9 @@ type test struct {
 }
 
 func TestParagraphs(t *testing.T) {
-	testName := "Paragraph wrapping"
+	testName := "Paragraph Wrapper"
 	tstore := types.NewTemplateStore()
-	ptest, err := newTest("template parser - "+testName, paraIn, paraOut, tstore.WrapParagraphs)
+	ptest, err := newTest("Template Parser - "+testName, paraIn, paraOut, tstore.WrapParagraphs)
 	if err != nil {
 		t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
 	}
@@ -43,10 +48,10 @@ func TestParagraphs(t *testing.T) {
 }
 
 func TestUTF8Replacement(t *testing.T) {
-	testName := "UTF-8 char code replacement"
+	testName := "UTF-8 Character Code Replacement"
 	tstore := types.NewTemplateStore()
 
-	repltest, err := newTest("template parser - "+testName, replcharIn, replcharOut, tstore.ReplaceChars)
+	repltest, err := newTest("Template Parser - "+testName, replcharIn, replcharOut, tstore.ReplaceChars)
 	if err != nil {
 		t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
 	}
@@ -61,6 +66,26 @@ func TestUTF8Replacement(t *testing.T) {
 	}
 }
 
+func TestContentWrapper(t *testing.T) {
+	testName := "Content Wrapper"
+	tstore := types.NewTemplateStore()
+
+	wraptest, err := newTest("Template Parser - "+testName, wrapIn, wrapOut, tstore.WrapContent)
+	if err != nil {
+		t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
+	}
+
+	got, err := wraptest.fn(wraptest.input)
+	if err != nil {
+		t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
+	}
+
+	if !reflect.DeepEqual(wraptest.want, got) {
+		t.Fatalf("Test %s failed \n want:\n%+v\n\n got:\n%+v\n", testName, wraptest.want, got)
+	}
+
+}
+
 func TestPostLinks(t *testing.T) {
 	tstore := types.NewTemplateStore()
 	tests := []*test{}
@@ -71,7 +96,7 @@ func TestPostLinks(t *testing.T) {
 		plin := postLinkPath + string(v) + "/input.txt"
 		plout := postLinkPath + string(v) + "/output.txt"
 
-		pltest, err := newTest("template parser - "+testName, plin, plout, tstore.ParsePostLinks)
+		pltest, err := newTest("Template Parser - "+testName, plin, plout, tstore.ParsePostLinks)
 		if err != nil {
 			t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
 		}

@@ -122,22 +122,26 @@ func (ah *ArticleHandler) handleNewArticleComment(rc *types.RequestCtx) error {
 	newCommentAssets := []*types.Asset{}
 	newCommentAssetInterfaces := []interface{}{}
 
-	for _, v := range details.Assets {
-		a := types.NewAsset(v.SourceID, rc.AccountCtx.Account.ID)
-		a.FileName = v.FileName
-		a.Description = v.Description
-		a.Tags = v.Tags
-		newCommentAssets = append(newCommentAssets, a)
+	if len(details.Assets) > 0 {
+		for _, v := range details.Assets {
+			a := types.NewAsset(v.SourceID, rc.AccountCtx.Account.ID)
+			a.FileName = v.FileName
+			a.Description = v.Description
+			a.Tags = v.Tags
+			newCommentAssets = append(newCommentAssets, a)
+		}
 	}
 
-	// @todo - replace with parsed body
-	commentBody := details.Content
+	str, err := rc.TemplateStore.Parse(details.Content)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
 
 	comment := types.NewArticleComment()
 
 	article.CommentRef++
 	comment.CommentNumber = article.CommentRef
-	comment.Body = commentBody
+	comment.Body = str
 	comment.AuthorID = rc.AccountCtx.Account.ID
 
 	comment.UpdatedAt = &ts
@@ -147,19 +151,20 @@ func (ah *ArticleHandler) handleNewArticleComment(rc *types.RequestCtx) error {
 		comment.AuthorAnon = true
 	}
 
-	for _, v := range newCommentAssets {
-		comment.Assets = append(comment.Assets, v.ID)
-		newCommentAssetInterfaces = append(newCommentAssetInterfaces, v)
+	if len(details.Assets) > 0 {
+		for _, v := range newCommentAssets {
+			comment.Assets = append(comment.Assets, v.ID)
+			newCommentAssetInterfaces = append(newCommentAssetInterfaces, v)
+		}
+		err = rc.Store.SaveNewMulti(newCommentAssetInterfaces, "assets")
+		if err != nil {
+			return ResolveResponseErr(rc, types.ErrorUnexpected())
+		}
 	}
 
 	article.Comments = append(article.Comments, comment.ID)
 
 	// save & update associative docs
-	err = rc.Store.SaveNewMulti(newCommentAssetInterfaces, "assets")
-	if err != nil {
-		return ResolveResponseErr(rc, types.ErrorUnexpected())
-	}
-
 	err = rc.Store.SaveNewSingle(comment, "article_comments")
 	if err != nil {
 		return ResolveResponseErr(rc, types.ErrorUnexpected())

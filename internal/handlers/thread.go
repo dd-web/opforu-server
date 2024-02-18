@@ -94,8 +94,6 @@ func (th *ThreadHandler) handleThreadReply(rc *types.RequestCtx) error {
 	newPostAssets := []*types.Asset{}
 	newPostAssetInterfaces := []interface{}{}
 
-	// no idea why this check is necessary but it is
-	// there is otherwise no stack trace information and we regardless receive 200 response? weird.
 	if len(details.Assets) > 0 {
 		for _, v := range details.Assets {
 			a := types.NewAsset(v.SourceID, rc.AccountCtx.Account.ID)
@@ -106,8 +104,7 @@ func (th *ThreadHandler) handleThreadReply(rc *types.RequestCtx) error {
 		}
 	}
 
-	tstore := types.NewTemplateStore()
-	str, err := tstore.Parse(details.Content)
+	str, err := rc.TemplateStore.Parse(details.Content)
 	if err != nil {
 		return ResolveResponseErr(rc, types.ErrorUnexpected())
 	}

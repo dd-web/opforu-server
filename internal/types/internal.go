@@ -42,6 +42,7 @@ type RequestCtx struct {
 	Records           []bson.M            `json:"records"` // resource(s) we intend to return to the client
 	Store             *Store
 	AccountCtx        *AccountCtx
+	TemplateStore     *TemplateStore
 	UnresolvedAccount bool
 	ResponseList      []bson.M
 	ResponseData      bson.M
@@ -60,6 +61,7 @@ func NewRequestCtx(w http.ResponseWriter, r *http.Request) *RequestCtx {
 		ResponseList:      []bson.M{},
 		ResponseData:      bson.M{},
 		AccountCtx:        NewAccountCtx(),
+		TemplateStore:     NewTemplateStore(),
 		UnresolvedAccount: false,
 	}).Resolve()
 }

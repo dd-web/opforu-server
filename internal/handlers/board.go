@@ -158,11 +158,16 @@ func (bh *BoardHandler) handleNewThread(rc *types.RequestCtx) error {
 	newIdentity.Account = rc.AccountCtx.Account.ID
 	newIdentity.Role = types.ThreadRoleCreator
 
+	str, err := rc.TemplateStore.Parse(details.Content)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
 	thread := types.NewThread()
 
 	newIdentity.Thread = thread.ID
 	thread.Title = details.Title
-	thread.Body = details.Content
+	thread.Body = str
 	thread.Board = board.ID
 	thread.Creator = newIdentity.ID
 	thread.Mods = []primitive.ObjectID{newIdentity.ID}
