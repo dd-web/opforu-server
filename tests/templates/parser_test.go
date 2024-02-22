@@ -13,9 +13,6 @@ var (
 	replcharIn  = "../data/replacechars/input.txt"
 	replcharOut = "../data/replacechars/output.txt"
 
-	paraIn  = "../data/paragraphs/input.txt"
-	paraOut = "../data/paragraphs/output.txt"
-
 	wrapIn  = "../data/wrapper/input.txt"
 	wrapOut = "../data/wrapper/output.txt"
 
@@ -27,27 +24,6 @@ type test struct {
 	input string
 	want  string
 	fn    func(string) (string, error)
-}
-
-func TestParagraphs(t *testing.T) {
-	// these work. and i have NO IDEA WHY IM GETTING DIFFERENT OUTPUT FROM SAME INPUT
-
-	// testName := "Paragraph Wrapper"
-	// tstore := types.NewTemplateStore()
-
-	// ptest, err := newTest("Template Parser - "+testName, paraIn, paraOut, tstore.Parse)
-	// if err != nil {
-	// 	t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
-	// }
-
-	// got, err := ptest.fn(ptest.input)
-	// if err != nil {
-	// 	t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
-	// }
-
-	// if !reflect.DeepEqual(ptest.want, got) {
-	// 	t.Fatalf("Test %s failed \n want:\n%+v\n\n got:\n%+v\n", testName, ptest.want, got)
-	// }
 }
 
 func TestUTF8Replacement(t *testing.T) {

@@ -65,6 +65,7 @@ func main() {
 
 	// internal server routes
 	handler.Router.HandleFunc("/api/internal/session/{session_id}", handlers.WrapFn(handler_internal.HandleGetSession))
+	handler.Router.HandleFunc("/api/internal/post/{thread_slug}/{post_number}", handlers.WrapFn(handler_internal.HandleGetPost))
 
 	// request config
 	handler.Router.Use(mux.CORSMethodMiddleware(handler.Router))

@@ -8,7 +8,9 @@ package handlers
 
 import (
 	"fmt"
+	"strconv"
 
+	"github.com/dd-web/opforu-server/internal/builder"
 	"github.com/dd-web/opforu-server/internal/types"
 	"github.com/gorilla/mux"
 )
@@ -46,6 +48,50 @@ func (ih *InternalHandler) HandleGetSession(rc *types.RequestCtx) error {
 
 	rc.AccountCtx.Session = session
 	rc.AccountCtx.Account = session.Account
+
+	return ResolveResponse(rc)
+}
+
+// METHOD: GET
+// PATH: /api/internal/post/{thread_slug}/{post_number}
+// retreives a post by first looking up the thread, then finding the post with that thread_id and post_number
+func (ih *InternalHandler) HandleGetPost(rc *types.RequestCtx) error {
+	rc.UpdateStore(ih.rh.Store)
+	vars := mux.Vars(rc.Request)
+
+	thread, err := rc.Store.FindThreadBySlug(vars["thread_slug"])
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorNotFound("thread"))
+	}
+
+	board, err := rc.Store.FindBoardByObjectID(thread.Board)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorNotFound("post's board"))
+	}
+
+	postNum, err := strconv.Atoi(vars["post_number"])
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorNotFound("post"))
+	}
+
+	if postNum < 1 {
+		return ResolveResponseErr(rc, types.ErrorNotFound("post"))
+	}
+
+	p, err := rc.Store.RunAggregation("posts", builder.QrStrLookupPost(thread.ID, postNum, thread.Slug, board.Short))
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorNotFound("post"))
+	}
+
+	if len(p) == 0 {
+		return ResolveResponseErr(rc, types.ErrorNotFound("post"))
+	}
+
+	if p[0] == nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	rc.AddToResponseList("post", p[0])
 
 	return ResolveResponse(rc)
 }
