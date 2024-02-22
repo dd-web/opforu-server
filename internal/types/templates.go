@@ -22,7 +22,17 @@ var (
 		"thread-external-board": regexp.MustCompile(`(?m)&gt;&gt;([[:alpha:]]{2,5})/([[:alnum:]]{8,12})[[:blank:]]`),                    // 1 = board short, 2 = threadslug
 		"post-external-board":   regexp.MustCompile(`(?m)&gt;&gt;([[:alpha:]]{2,5})/([[:alnum:]]{8,12})/([[:digit:]]{1,9})[[:blank:]]`), // 1 = board short, 2 = threadslug, 3 = post_num
 	}
-	NewLineFeedLimit = regexp.MustCompile(`(?m)[[:cntrl:]]{2,}`)
+	// paragraph delimiting
+	CtrlCharReplace     = regexp.MustCompile(`(?m)[[:cntrl:]]`)
+	ExcessiveNewLineFix = regexp.MustCompile(`(?m)\n{2,}`)
+
+	// whitespace fixes
+	LineStartEndSpaceFix = regexp.MustCompile(`(?m)^[[:blank:]]+|[[:blank:]]+$`)
+	ExtraSpaceLimit      = regexp.MustCompile(`(?m)[[:blank:]]+`)
+
+	// line break fixes
+	ExcessiveBreakLimit = regexp.MustCompile(`(?m)<br>+`)
+	LinePrefixSufixFix  = regexp.MustCompile(`(?m)^<br>|<br>$`)
 )
 
 type TemplateStore struct {
@@ -165,29 +175,65 @@ func (ts *TemplateStore) WrapParagraphs(text string) (string, error) {
 		return "", fmt.Errorf("unresolvable template %s", "paragraph")
 	}
 
-	strRepl := text
-	for _, match := range NewLineFeedLimit.FindAllString(text, -1) {
-		strRepl = strings.ReplaceAll(strRepl, match, "<br>")
+	passage := text
+
+	// Remove excessive spaces
+	for _, match := range ExtraSpaceLimit.FindAllString(passage, -1) {
+		passage = strings.ReplaceAll(passage, match, " ")
 	}
 
-	matchSplit := strings.Split(strRepl, "<br>")
-	finished := ""
+	// replaces utf8 vertical whitespace text with \n
+	for _, match := range CtrlCharReplace.FindAllString(passage, -1) {
+		passage = strings.ReplaceAll(passage, match, "\n")
+	}
 
-	for _, v := range matchSplit {
-		innert := &innerTemplate{
-			Content: v,
+	splitted := strings.Split(passage, "\n")
+
+	joined := ""
+	for k, v := range splitted {
+		if k == 0 {
+			joined = removeWhiteSpace(v)
+		} else {
+			joined = joined + "\n" + removeWhiteSpace(v)
 		}
-		if v != "" {
+	}
+	passage = joined
+
+	// replaces more than one newline in a row with a br tag
+	for _, match := range ExcessiveNewLineFix.FindAllString(passage, -1) {
+		if match != "" {
+			passage = strings.ReplaceAll(passage, match, "<br>")
+		}
+	}
+
+	passageParagraphs := strings.Split(passage, "<br><br>")
+
+	resultText := ""
+	for ix, line := range passageParagraphs {
+		lineFixed := strings.ReplaceAll(line, "\n", "")
+		newLine := LinePrefixSufixFix.ReplaceAllLiteralString(lineFixed, "")
+
+		fmt.Printf("LINE: %s\n", newLine)
+		if newLine != "" && len(newLine) > 0 && newLine != "<br>" {
+			innert := &innerTemplate{
+				Content: newLine,
+			}
+
 			buf := new(bytes.Buffer)
 			err := t.Execute(buf, innert)
 			if err != nil {
 				return "", err
 			}
-			finished = finished + buf.String()
 
+			if ix == 0 {
+				resultText = buf.String()
+			} else {
+				resultText += buf.String()
+			}
 		}
 	}
-	return finished, nil
+
+	return resultText, nil
 }
 
 func (ts *TemplateStore) WrapContent(text string) (string, error) {
@@ -233,4 +279,8 @@ func (ts *TemplateStore) Parse(text string) (string, error) {
 	}
 
 	return wrapped, nil
+}
+
+func removeWhiteSpace(text string) string {
+	return LineStartEndSpaceFix.ReplaceAllLiteralString(text, "")
 }

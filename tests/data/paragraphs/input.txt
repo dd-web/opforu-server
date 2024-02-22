@@ -1,8 +1,22 @@
-hey here&#39;s another example of some input here demonstrating how quotes work. &gt;this won&#39;t be a quote.
-&gt;this however, will be. it should go on until a newline followed by a newline is observed.
+test new line
+and paragraph
+wrapping
 
-the break demonstrates we&#39;re done with the quote. &gt;again this won&#39;t be quoted.
-&gt;and this will be.
-as well as this.
+lone paragraph
 
-but not this.
+
+this should have
+one too
+
+
+
+
+and      
+	all        
+		of         
+			this          
+
+
+
+
+too
