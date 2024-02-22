@@ -16,11 +16,11 @@ type innerTemplate struct {
 
 var (
 	PostLinkPatterns = map[string]*regexp.Regexp{
-		"post-internal-thread":  regexp.MustCompile(`(?m)&gt;&gt;([[:digit:]]{1,9})[[:blank:]]`),                                        // 1 = post_num
-		"thread-internal-board": regexp.MustCompile(`(?m)&gt;&gt;([[:alnum:]]{8,12})[[:blank:]]`),                                       // 1 = threadslug
-		"post-internal-board":   regexp.MustCompile(`(?m)&gt;&gt;([[:alnum:]]{8,12})/([[:digit:]]{1,9})[[:blank:]]`),                    // 1 = threadslug, 2 = post_num
-		"thread-external-board": regexp.MustCompile(`(?m)&gt;&gt;([[:alpha:]]{2,5})/([[:alnum:]]{8,12})[[:blank:]]`),                    // 1 = board short, 2 = threadslug
-		"post-external-board":   regexp.MustCompile(`(?m)&gt;&gt;([[:alpha:]]{2,5})/([[:alnum:]]{8,12})/([[:digit:]]{1,9})[[:blank:]]`), // 1 = board short, 2 = threadslug, 3 = post_num
+		"post-internal-thread":  regexp.MustCompile(`(?m)&gt;&gt;([[:digit:]]{1,9})&lt;`),                                        // 1 = post_num
+		"thread-internal-board": regexp.MustCompile(`(?m)&gt;&gt;([[:alnum:]]{8,12})&lt;`),                                       // 1 = threadslug
+		"post-internal-board":   regexp.MustCompile(`(?m)&gt;&gt;([[:alnum:]]{8,12})/([[:digit:]]{1,9})&lt;`),                    // 1 = threadslug, 2 = post_num
+		"thread-external-board": regexp.MustCompile(`(?m)&gt;&gt;([[:alpha:]]{2,5})/([[:alnum:]]{8,12})&lt;`),                    // 1 = board short, 2 = threadslug
+		"post-external-board":   regexp.MustCompile(`(?m)&gt;&gt;([[:alpha:]]{2,5})/([[:alnum:]]{8,12})/([[:digit:]]{1,9})&lt;`), // 1 = board short, 2 = threadslug, 3 = post_num
 	}
 	// paragraph delimiting
 	CtrlCharReplace     = regexp.MustCompile(`(?m)[[:cntrl:]]`)
@@ -127,6 +127,7 @@ func (ts *TemplateStore) ParsePostLinks(text string) (string, error) {
 			buf := new(bytes.Buffer)
 
 			content := strings.ReplaceAll(match, "&gt;", "")
+			content = strings.ReplaceAll(content, "&lt;", "")
 			content = strings.ReplaceAll(content, " ", "")
 			innert.Content = content
 
@@ -135,7 +136,7 @@ func (ts *TemplateStore) ParsePostLinks(text string) (string, error) {
 				if err != nil {
 					return "", err
 				}
-				matchList[match] = buf.String() + " "
+				matchList[match] = buf.String()
 			}
 		}
 

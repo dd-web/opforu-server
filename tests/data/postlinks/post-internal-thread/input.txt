@@ -1,1 +1,1 @@
-some text and &gt;&gt;882 some more after
+some text and &gt;&gt;882&lt; some more after

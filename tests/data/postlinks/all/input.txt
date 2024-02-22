@@ -1,6 +1,6 @@
 this test is for all types of links in a single file.
-here is &gt;&gt;772 post internal thread. and &gt;&gt;82jrd92kda thread internal board.
+here is &gt;&gt;772&lt; post internal thread. and &gt;&gt;82jrd92kda&lt; thread internal board.
 
-and here is post internal board &gt;&gt;9k2ad02nzbf/812 thats cool. and then we have
-thread external board &gt;&gt;gen/02nd2adc2dka and lastly &gt;&gt;math/2jsflg2azc/112 is
+and here is post internal board &gt;&gt;9k2ad02nzbf/812&lt; thats cool. and then we have
+thread external board &gt;&gt;gen/02nd2adc2dka&lt; and lastly &gt;&gt;math/2jsflg2azc/112&lt; is
 post external board. all link types within one post.
