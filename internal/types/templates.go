@@ -29,10 +29,6 @@ var (
 	// whitespace fixes
 	LineStartEndSpaceFix = regexp.MustCompile(`(?m)^[[:blank:]]+|[[:blank:]]+$`)
 	ExtraSpaceLimit      = regexp.MustCompile(`(?m)[[:blank:]]+`)
-
-	// line break fixes
-	ExcessiveBreakLimit = regexp.MustCompile(`(?m)<br>+`)
-	LinePrefixSufixFix  = regexp.MustCompile(`(?m)^<br>|<br>$`)
 )
 
 type TemplateStore struct {
@@ -169,74 +165,8 @@ func (ts *TemplateStore) ReplaceChars(text string) (string, error) {
 	return buf.String(), nil
 }
 
-// wraps whitespace deliminated text with paragraph tags
-func (ts *TemplateStore) WrapParagraphs(text string) (string, error) {
-	t, ok := ts.Text["paragraph"]
-	if !ok {
-		return "", fmt.Errorf("unresolvable template %s", "paragraph")
-	}
-
-	passage := text
-
-	// Remove excessive spaces
-	for _, match := range ExtraSpaceLimit.FindAllString(passage, -1) {
-		passage = strings.ReplaceAll(passage, match, " ")
-	}
-
-	// replaces utf8 vertical whitespace text with \n
-	for _, match := range CtrlCharReplace.FindAllString(passage, -1) {
-		passage = strings.ReplaceAll(passage, match, "\n")
-	}
-
-	splitted := strings.Split(passage, "\n")
-
-	joined := ""
-	for k, v := range splitted {
-		if k == 0 {
-			joined = removeWhiteSpace(v)
-		} else {
-			joined = joined + "\n" + removeWhiteSpace(v)
-		}
-	}
-	passage = joined
-
-	// replaces more than one newline in a row with a br tag
-	for _, match := range ExcessiveNewLineFix.FindAllString(passage, -1) {
-		if match != "" {
-			passage = strings.ReplaceAll(passage, match, "<br>")
-		}
-	}
-
-	passageParagraphs := strings.Split(passage, "<br><br>")
-
-	resultText := ""
-	for ix, line := range passageParagraphs {
-		lineFixed := strings.ReplaceAll(line, "\n", "")
-		newLine := LinePrefixSufixFix.ReplaceAllLiteralString(lineFixed, "")
-
-		fmt.Printf("LINE: %s\n", newLine)
-		if newLine != "" && len(newLine) > 0 && newLine != "<br>" {
-			innert := &innerTemplate{
-				Content: newLine,
-			}
-
-			buf := new(bytes.Buffer)
-			err := t.Execute(buf, innert)
-			if err != nil {
-				return "", err
-			}
-
-			if ix == 0 {
-				resultText = buf.String()
-			} else {
-				resultText += buf.String()
-			}
-		}
-	}
-
-	return resultText, nil
-}
-
+// wraps content in a container div with the content-body css class. this occurs for all
+// types of submitted content as article body text
 func (ts *TemplateStore) WrapContent(text string) (string, error) {
 	t, ok := ts.Text["wrapper"]
 	if !ok {
@@ -255,6 +185,38 @@ func (ts *TemplateStore) WrapContent(text string) (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+// parses out excessive new lines & whitespace and deliminates lines into paragraph tags
+// any line without text (line is only newline char) is the space between paragraphs, which is why we
+// parse out extra nonsesne here to make it easier. also normalizes line endings to LF style endings
+func (ts *TemplateStore) WrapParagraphs(text string) (string, error) {
+	passage, err := ts.NormalizeLineEndings(text)
+	if err != nil {
+		return "", err
+	}
+
+	passage = ExtraSpaceLimit.ReplaceAllLiteralString(passage, " ")
+	passage = LineStartEndSpaceFix.ReplaceAllLiteralString(passage, "")
+	passage = ExcessiveNewLineFix.ReplaceAllLiteralString(passage, "<#delim#>")
+	passage = CtrlCharReplace.ReplaceAllLiteralString(passage, "<br>")
+
+	ptagArr := strings.Split(passage, "<#delim#>")
+	resultStr := ""
+
+	for _, v := range ptagArr {
+		resultStr += ts.executeTemplateParagraph(v)
+	}
+
+	return resultStr, nil
+}
+
+// normalizes line endings between windows/mac to all use linux LF style endings
+func (ts *TemplateStore) NormalizeLineEndings(text string) (string, error) {
+	bytestr := []byte(text)
+	bytestr = bytes.Replace(bytestr, []byte{13, 10}, []byte{10}, -1)
+	bytestr = bytes.Replace(bytestr, []byte{13}, []byte{10}, -1)
+	return string(bytestr), nil
 }
 
 // parses user content to generate an html output
@@ -282,6 +244,21 @@ func (ts *TemplateStore) Parse(text string) (string, error) {
 	return wrapped, nil
 }
 
-func removeWhiteSpace(text string) string {
-	return LineStartEndSpaceFix.ReplaceAllLiteralString(text, "")
+func (ts *TemplateStore) executeTemplateParagraph(text string) string {
+	t, ok := ts.Text["paragraph"]
+	if !ok {
+		panic("paragraph template is unresolvable")
+	}
+
+	innert := &innerTemplate{
+		Content: text,
+	}
+
+	buf := new(bytes.Buffer)
+	err := t.Execute(buf, innert)
+	if err != nil {
+		return ""
+	}
+
+	return buf.String()
 }

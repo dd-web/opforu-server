@@ -10,11 +10,16 @@ import (
 )
 
 var (
-	replcharIn  = "../data/replacechars/input.txt"
-	replcharOut = "../data/replacechars/output.txt"
+	dataPathStart = "../data/"
 
-	wrapIn  = "../data/wrapper/input.txt"
-	wrapOut = "../data/wrapper/output.txt"
+	replcharIn  = dataPathStart + "replacechars/input.txt"
+	replcharOut = dataPathStart + "replacechars/output.txt"
+
+	wrapIn  = dataPathStart + "wrapper/input.txt"
+	wrapOut = dataPathStart + "wrapper/output.txt"
+
+	ptagIn  = dataPathStart + "paragraphs/input.txt"
+	ptagOut = dataPathStart + "paragraphs/output.txt"
 
 	postLinkPath = "../data/postlinks/"
 )
@@ -24,6 +29,25 @@ type test struct {
 	input string
 	want  string
 	fn    func(string) (string, error)
+}
+
+func TestParagraphWrapping(t *testing.T) {
+	testName := "Paragraph & Line breaks"
+	tstore := types.NewTemplateStore()
+
+	ptest, err := newTest("Template Parser - "+testName, ptagIn, ptagOut, tstore.WrapParagraphs)
+	if err != nil {
+		t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
+	}
+
+	got, err := ptest.fn(ptest.input)
+	if err != nil {
+		t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
+	}
+
+	if !reflect.DeepEqual(ptest.want, got) {
+		t.Fatalf("Test %s failed \n want:\n%+v\n\n got:\n%+v\n", testName, ptest.want, got)
+	}
 }
 
 func TestUTF8Replacement(t *testing.T) {
