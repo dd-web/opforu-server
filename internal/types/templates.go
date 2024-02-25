@@ -15,7 +15,7 @@ type innerTemplate struct {
 }
 
 var (
-	PostLinkPatterns = map[string]*regexp.Regexp{
+	PostLinkRegex = map[string]*regexp.Regexp{
 		"post-internal-thread":  regexp.MustCompile(`(?m)&gt;&gt;([[:digit:]]{1,9})&lt;`),                                        // 1 = post_num
 		"thread-internal-board": regexp.MustCompile(`(?m)&gt;&gt;([[:alnum:]]{8,12})&lt;`),                                       // 1 = threadslug
 		"post-internal-board":   regexp.MustCompile(`(?m)&gt;&gt;([[:alnum:]]{8,12})/([[:digit:]]{1,9})&lt;`),                    // 1 = threadslug, 2 = post_num
@@ -36,7 +36,7 @@ type TemplateStore struct {
 	// for any html we wish to inject because our previous iterations become invalid html. This is used to invalidate
 	// any html a user may have submitted. Use it once and once only against any submitted content. (sanitize first)
 	HtmlReplTempl *template.Template
-	PostLinks     map[string]*texttempl.Template
+	PostLinkTempl *texttempl.Template
 	Text          map[string]*texttempl.Template
 	PostLinkKinds []PostLink
 }
@@ -44,7 +44,7 @@ type TemplateStore struct {
 func NewTemplateStore() *TemplateStore {
 	t := &TemplateStore{
 		HtmlReplTempl: &template.Template{},
-		PostLinks:     map[string]*texttempl.Template{},
+		PostLinkTempl: &texttempl.Template{},
 		Text:          map[string]*texttempl.Template{},
 	}
 	t.Hydrate()
@@ -60,31 +60,29 @@ func (ts *TemplateStore) Hydrate() {
 		PostExternalBoard,
 	}
 
-	for _, v := range ts.PostLinkKinds {
-		tmpl, err := texttempl.New(string(v)).Parse(`<button class="{{ .ClassList }}">{{ .Content }}</button>`)
-		if err != nil {
-			panic(err)
-		}
-		ts.PostLinks[string(v)] = tmpl // (v) post link
+	postLink, err := texttempl.New(string("post-link")).Parse(`<button class="{{ .ClassList }}">{{ .Content }}</button>`)
+	if err != nil {
+		panic(err)
 	}
+	ts.PostLinkTempl = postLink
 
 	replacement, err := template.New("utf-8-replace").Parse("{{ .Content }}")
 	if err != nil {
 		panic(err)
 	}
-	ts.HtmlReplTempl = replacement // utf-8 char code replacements
+	ts.HtmlReplTempl = replacement
 
 	paragraphs, err := texttempl.New("paragraph").Parse("<p>{{ .Content }}</p>")
 	if err != nil {
 		panic(err)
 	}
-	ts.Text["paragraph"] = paragraphs // <p> tag wrapper
+	ts.Text["paragraph"] = paragraphs
 
 	wrapper, err := texttempl.New("wrapper").Parse(`<div class="{{ .ClassList }}">{{ .Content }}</div>`)
 	if err != nil {
 		panic(err)
 	}
-	ts.Text["wrapper"] = wrapper // <div> wrapper
+	ts.Text["wrapper"] = wrapper
 
 }
 
@@ -100,48 +98,38 @@ const (
 
 // parses entire input's post links, all instances will be replaced
 func (ts *TemplateStore) ParsePostLinks(text string) (string, error) {
-	parsed := text
+	t := ts.PostLinkTempl
+	result := text
 
-	for _, postlinktype := range ts.PostLinkKinds {
-		tmpl, ok := ts.PostLinks[string(postlinktype)]
+	for _, postlink := range ts.PostLinkKinds {
+		rxp, ok := PostLinkRegex[string(postlink)]
 		if !ok {
-			return "", fmt.Errorf("unresolvable template: %s", string(postlinktype))
+			panic(fmt.Sprintf("unresolvable regex - %s", postlink))
 		}
-
-		rxp, ok := PostLinkPatterns[string(postlinktype)]
-		if !ok {
-			return "", fmt.Errorf("unresolvable pattern match: %s", string(postlinktype))
-		}
-
-		matchList := map[string]string{} // map instead of array is to proactively prevent subtle bug
-
-		for _, match := range rxp.FindAllString(text, -1) {
-			innert := &innerTemplate{
-				Content:   "",
-				ClassList: fmt.Sprintf("%s post-link", string(postlinktype)),
-			}
-			buf := new(bytes.Buffer)
-
-			content := strings.ReplaceAll(match, "&gt;", "")
-			content = strings.ReplaceAll(content, "&lt;", "")
-			content = strings.ReplaceAll(content, " ", "")
-			innert.Content = content
-
-			if innert.Content != "" {
-				err := tmpl.Execute(buf, innert)
-				if err != nil {
-					return "", err
-				}
-				matchList[match] = buf.String()
-			}
-		}
-
-		for k, v := range matchList {
-			parsed = strings.ReplaceAll(parsed, k, v)
-		}
+		result = rxp.ReplaceAllStringFunc(result, postLinkReplWrapper(postlink, t))
 	}
+	return result, nil
+}
 
-	return parsed, nil
+// func constructor for RAS regexp func
+func postLinkReplWrapper(kind PostLink, tpl *texttempl.Template) func(string) string {
+	return func(s string) string {
+		content := strings.ReplaceAll(s, "&gt;", "")
+		content = strings.ReplaceAll(content, "&lt;", "")
+
+		innert := &innerTemplate{
+			Content:   content,
+			ClassList: fmt.Sprintf("%s post-link", string(kind)),
+		}
+
+		buf := new(bytes.Buffer)
+		err := tpl.Execute(buf, innert)
+		if err != nil {
+			panic(fmt.Sprintf("post links template execution failed: \n kind: %s\n content: %s\n classlist: %s\n err: %+v\n", kind, s, innert.ClassList, err))
+		}
+
+		return buf.String()
+	}
 }
 
 // uses go's template system to sanitize html into their character codes utf-8 (js uses utf-16)
@@ -191,14 +179,10 @@ func (ts *TemplateStore) WrapContent(text string) (string, error) {
 // any line without text (line is only newline char) is the space between paragraphs, which is why we
 // parse out extra nonsesne here to make it easier. also normalizes line endings to LF style endings
 func (ts *TemplateStore) WrapParagraphs(text string) (string, error) {
-	passage, err := ts.NormalizeLineEndings(text)
-	if err != nil {
-		return "", err
-	}
-
+	passage := ts.NormalizeLineEndings(text)
 	passage = ExtraSpaceLimit.ReplaceAllLiteralString(passage, " ")
 	passage = LineStartEndSpaceFix.ReplaceAllLiteralString(passage, "")
-	passage = ExcessiveNewLineFix.ReplaceAllLiteralString(passage, "<#delim#>")
+	passage = ExcessiveNewLineFix.ReplaceAllLiteralString(passage, "<#delim#>") // this is okay. tags are parsed out earlier
 	passage = CtrlCharReplace.ReplaceAllLiteralString(passage, "<br>")
 
 	ptagArr := strings.Split(passage, "<#delim#>")
@@ -212,11 +196,11 @@ func (ts *TemplateStore) WrapParagraphs(text string) (string, error) {
 }
 
 // normalizes line endings between windows/mac to all use linux LF style endings
-func (ts *TemplateStore) NormalizeLineEndings(text string) (string, error) {
+func (ts *TemplateStore) NormalizeLineEndings(text string) string {
 	bytestr := []byte(text)
 	bytestr = bytes.Replace(bytestr, []byte{13, 10}, []byte{10}, -1)
 	bytestr = bytes.Replace(bytestr, []byte{13}, []byte{10}, -1)
-	return string(bytestr), nil
+	return string(bytestr)
 }
 
 // parses user content to generate an html output

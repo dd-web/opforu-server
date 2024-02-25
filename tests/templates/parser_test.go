@@ -21,7 +21,7 @@ var (
 	ptagIn  = dataPathStart + "paragraphs/input.txt"
 	ptagOut = dataPathStart + "paragraphs/output.txt"
 
-	postLinkPath = "../data/postlinks/"
+	postLinkPath = dataPathStart + "postlinks/"
 )
 
 type test struct {
