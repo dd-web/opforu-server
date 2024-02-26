@@ -37,7 +37,6 @@ type TemplateStore struct {
 	// for any html we wish to inject because our previous iterations become invalid html. This is used to invalidate
 	// any html a user may have submitted. Use it once and once only against any submitted content. (sanitize first)
 	HtmlReplTempl *template.Template
-	PostLinkTempl *texttempl.Template
 	Text          map[string]*texttempl.Template
 	PostLinkKinds []PostLink
 }
@@ -45,7 +44,6 @@ type TemplateStore struct {
 func NewTemplateStore() *TemplateStore {
 	t := &TemplateStore{
 		HtmlReplTempl: &template.Template{},
-		PostLinkTempl: &texttempl.Template{},
 		Text:          map[string]*texttempl.Template{},
 	}
 	t.Hydrate()
@@ -61,17 +59,21 @@ func (ts *TemplateStore) Hydrate() {
 		PostExternalBoard,
 	}
 
-	postLink, err := texttempl.New(string("post-link")).Parse(`<button class="{{ .ClassList }}">{{ .Content }}</button>`)
-	if err != nil {
-		panic(err)
-	}
-	ts.PostLinkTempl = postLink
+	// Html template
 
 	replacement, err := template.New("utf-8-replace").Parse("{{ .Content }}")
 	if err != nil {
 		panic(err)
 	}
 	ts.HtmlReplTempl = replacement
+
+	// Text templates
+
+	postLink, err := texttempl.New(string("post-link")).Parse(`<button class="{{ .ClassList }}">{{ .Content }}</button>`)
+	if err != nil {
+		panic(err)
+	}
+	ts.Text["postlink"] = postLink
 
 	paragraphs, err := texttempl.New("paragraph").Parse("<p>{{ .Content }}</p>")
 	if err != nil {
@@ -105,7 +107,11 @@ const (
 
 // parses entire input's post links, all instances will be replaced
 func (ts *TemplateStore) ParsePostLinks(text string) (string, error) {
-	t := ts.PostLinkTempl
+	t, ok := ts.Text["postlink"]
+	if !ok {
+		return "", fmt.Errorf("unresolvable template %s", "postlink")
+	}
+
 	result := text
 
 	for _, postlink := range ts.PostLinkKinds {
@@ -115,6 +121,7 @@ func (ts *TemplateStore) ParsePostLinks(text string) (string, error) {
 		}
 		result = rxp.ReplaceAllStringFunc(result, postLinkReplWrapper(postlink, t))
 	}
+	fmt.Printf("Result after post links:\n%s\n", result)
 	return result, nil
 }
 
@@ -203,7 +210,28 @@ func (ts *TemplateStore) WrapParagraphs(text string) (string, error) {
 }
 
 func (ts *TemplateStore) WrapQuotes(text string) (string, error) {
-	return QuoteWrap.ReplaceAllStringFunc(text, ts.executeTemplateQuote), nil
+	t, ok := ts.Text["quote"]
+	if !ok {
+		panic("quote template is unresolvable")
+	}
+	content := text
+
+	content = QuoteWrap.ReplaceAllStringFunc(content, func(c string) string {
+		ic := strings.ReplaceAll(c, "&#34;", "")
+		ic = strings.ReplaceAll(ic, "&gt;", "")
+		innert := &innerTemplate{
+			Content: ic,
+		}
+
+		buf := new(bytes.Buffer)
+		err := t.Execute(buf, innert)
+		if err != nil {
+			return ""
+		}
+		return buf.String()
+	})
+
+	return content, nil
 }
 
 // normalizes line endings between windows/mac to all use linux LF style endings
@@ -214,12 +242,28 @@ func (ts *TemplateStore) NormalizeLineEndings(text string) string {
 	return string(bytestr)
 }
 
+// normalizes character codes for parsing, as copy/pasted texts that seem identical are not always.
+func (ts *TemplateStore) NormalizeCharCodes(text string) string {
+	content := strings.ReplaceAll(text, "&gt;", ">")
+	content = strings.ReplaceAll(content, "&lt;", "<")
+	content = strings.ReplaceAll(content, "&#34;", `"`)
+	content = strings.ReplaceAll(content, "&#39;", `'`)
+	return content
+}
+
 // parses user content to generate an html output
 func (ts *TemplateStore) Parse(text string) (string, error) {
-	str, err := ts.ReplaceChars(text)
+	fmt.Printf("\nParse Input:\n%s\n\n", text)
+
+	// sucks that we have to do this, but self referential ascii recursion lol
+	normalized := ts.NormalizeCharCodes(text)
+
+	str, err := ts.ReplaceChars(normalized)
 	if err != nil {
 		return "", err
 	}
+
+	fmt.Printf("\nResult after ReplaceChars:\n%s\n\n", str)
 
 	paras, err := ts.WrapParagraphs(str)
 	if err != nil {
@@ -231,7 +275,12 @@ func (ts *TemplateStore) Parse(text string) (string, error) {
 		return "", err
 	}
 
-	wrapped, err := ts.WrapContent(postlinks)
+	quotes, err := ts.WrapQuotes(postlinks)
+	if err != nil {
+		return "", err
+	}
+
+	wrapped, err := ts.WrapContent(quotes)
 	if err != nil {
 		return "", err
 	}
@@ -247,28 +296,6 @@ func (ts *TemplateStore) executeTemplateParagraph(text string) string {
 
 	innert := &innerTemplate{
 		Content: text,
-	}
-
-	buf := new(bytes.Buffer)
-	err := t.Execute(buf, innert)
-	if err != nil {
-		return ""
-	}
-
-	return buf.String()
-}
-
-func (ts *TemplateStore) executeTemplateQuote(text string) string {
-	t, ok := ts.Text["quote"]
-	if !ok {
-		panic("quote template is unresolvable")
-	}
-
-	content := strings.ReplaceAll(text, "&#34;", "")
-	content = strings.ReplaceAll(content, "&gt;", "")
-
-	innert := &innerTemplate{
-		Content: content,
 	}
 
 	buf := new(bytes.Buffer)
