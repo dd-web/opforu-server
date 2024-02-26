@@ -21,6 +21,9 @@ var (
 	ptagIn  = dataPathStart + "paragraphs/input.txt"
 	ptagOut = dataPathStart + "paragraphs/output.txt"
 
+	quoteIn  = dataPathStart + "quotes/input.txt"
+	quoteOut = dataPathStart + "quotes/output.txt"
+
 	postLinkPath = dataPathStart + "postlinks/"
 )
 
@@ -29,6 +32,27 @@ type test struct {
 	input string
 	want  string
 	fn    func(string) (string, error)
+}
+
+func TestQuoteWrapping(t *testing.T) {
+	testName := "Quote Wrapping"
+	tstore := types.NewTemplateStore()
+
+	qtest, err := newTest("Template Parser - "+testName, quoteIn, quoteOut, tstore.WrapQuotes)
+	if err != nil {
+		t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
+	}
+
+	preprocessed, _ := tstore.ReplaceChars(qtest.input)
+
+	got, err := qtest.fn(preprocessed)
+	if err != nil {
+		t.Fatalf("Test %s failed, err wasn't nil: %+v", testName, err)
+	}
+
+	if !reflect.DeepEqual(qtest.want, got) {
+		t.Fatalf("Test %s failed \n want:\n%+v\n\n got:\n%+v\n", testName, qtest.want, got)
+	}
 }
 
 func TestParagraphWrapping(t *testing.T) {

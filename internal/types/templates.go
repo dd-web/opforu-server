@@ -22,9 +22,10 @@ var (
 		"thread-external-board": regexp.MustCompile(`(?m)&gt;&gt;([[:alpha:]]{2,5})/([[:alnum:]]{8,12})&lt;`),                    // 1 = board short, 2 = threadslug
 		"post-external-board":   regexp.MustCompile(`(?m)&gt;&gt;([[:alpha:]]{2,5})/([[:alnum:]]{8,12})/([[:digit:]]{1,9})&lt;`), // 1 = board short, 2 = threadslug, 3 = post_num
 	}
-	// paragraph delimiting
+	// paragraph delimiting patterns
 	CtrlCharReplace     = regexp.MustCompile(`(?m)[[:cntrl:]]`)
 	ExcessiveNewLineFix = regexp.MustCompile(`(?m)\n{2,}`)
+	QuoteWrap           = regexp.MustCompile(`(?ms)&gt;&#34;(.*)&#34;`)
 
 	// whitespace fixes
 	LineStartEndSpaceFix = regexp.MustCompile(`(?m)^[[:blank:]]+|[[:blank:]]+$`)
@@ -83,6 +84,12 @@ func (ts *TemplateStore) Hydrate() {
 		panic(err)
 	}
 	ts.Text["wrapper"] = wrapper
+
+	quotes, err := texttempl.New("quote").Parse(`<blockquote>{{ .Content }}</blockquote>`)
+	if err != nil {
+		panic(err)
+	}
+	ts.Text["quote"] = quotes
 
 }
 
@@ -195,6 +202,10 @@ func (ts *TemplateStore) WrapParagraphs(text string) (string, error) {
 	return resultStr, nil
 }
 
+func (ts *TemplateStore) WrapQuotes(text string) (string, error) {
+	return QuoteWrap.ReplaceAllStringFunc(text, ts.executeTemplateQuote), nil
+}
+
 // normalizes line endings between windows/mac to all use linux LF style endings
 func (ts *TemplateStore) NormalizeLineEndings(text string) string {
 	bytestr := []byte(text)
@@ -236,6 +247,28 @@ func (ts *TemplateStore) executeTemplateParagraph(text string) string {
 
 	innert := &innerTemplate{
 		Content: text,
+	}
+
+	buf := new(bytes.Buffer)
+	err := t.Execute(buf, innert)
+	if err != nil {
+		return ""
+	}
+
+	return buf.String()
+}
+
+func (ts *TemplateStore) executeTemplateQuote(text string) string {
+	t, ok := ts.Text["quote"]
+	if !ok {
+		panic("quote template is unresolvable")
+	}
+
+	content := strings.ReplaceAll(text, "&#34;", "")
+	content = strings.ReplaceAll(content, "&gt;", "")
+
+	innert := &innerTemplate{
+		Content: content,
 	}
 
 	buf := new(bytes.Buffer)

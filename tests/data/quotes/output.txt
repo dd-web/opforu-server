@@ -1,0 +1,6 @@
+some text before to ensure we deliminate correctly.
+
+<blockquote>here&#39;s an example of a quote. the entire thing is wrapped in quotes
+and a new line as well to demonstrate the quote only breaks on the termination string</blockquote>
+
+a bit after as well.
