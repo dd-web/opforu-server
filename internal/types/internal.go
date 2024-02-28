@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
@@ -139,6 +140,21 @@ func (rc *RequestCtx) ResolveAccountCtx() {
 		rc.UnresolvedAccount = true
 		rc.AccountCtx.ExpiredSession = true
 		return
+	}
+
+	if session.IsExpiringSoon() {
+		ts := time.Now().UTC()
+		exp := time.Now().Add(time.Duration(time.Hour * 24 * 7)).UTC()
+		session.Expires = &exp
+		session.UpdatedAt = &ts
+
+		err := rc.Store.UpdateSession(session)
+		if err != nil {
+			// hmm what to do on an error here, we could possibly recover..
+			// for now return an unresolvable account
+			rc.UnresolvedAccount = true
+			return
+		}
 	}
 
 	rc.AccountCtx.Session = session

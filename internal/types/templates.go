@@ -34,8 +34,7 @@ var (
 
 type TemplateStore struct {
 	// html templates replace all html character codes, our case is iterative which means we must use text templates
-	// for any html we wish to inject because our previous iterations become invalid html. This is used to invalidate
-	// any html a user may have submitted. Use it once and once only against any submitted content. (sanitize first)
+	// for any html we wish to inject because our previous iterations become invalid.
 	HtmlReplTempl *template.Template
 	Text          map[string]*texttempl.Template
 	PostLinkKinds []PostLink
@@ -60,7 +59,6 @@ func (ts *TemplateStore) Hydrate() {
 	}
 
 	// Html template
-
 	replacement, err := template.New("utf-8-replace").Parse("{{ .Content }}")
 	if err != nil {
 		panic(err)
@@ -68,7 +66,6 @@ func (ts *TemplateStore) Hydrate() {
 	ts.HtmlReplTempl = replacement
 
 	// Text templates
-
 	postLink, err := texttempl.New(string("post-link")).Parse(`<button class="{{ .ClassList }}">{{ .Content }}</button>`)
 	if err != nil {
 		panic(err)
@@ -121,7 +118,7 @@ func (ts *TemplateStore) ParsePostLinks(text string) (string, error) {
 		}
 		result = rxp.ReplaceAllStringFunc(result, postLinkReplWrapper(postlink, t))
 	}
-	fmt.Printf("Result after post links:\n%s\n", result)
+
 	return result, nil
 }
 
@@ -219,6 +216,7 @@ func (ts *TemplateStore) WrapQuotes(text string) (string, error) {
 	content = QuoteWrap.ReplaceAllStringFunc(content, func(c string) string {
 		ic := strings.ReplaceAll(c, "&#34;", "")
 		ic = strings.ReplaceAll(ic, "&gt;", "")
+
 		innert := &innerTemplate{
 			Content: ic,
 		}
@@ -253,42 +251,44 @@ func (ts *TemplateStore) NormalizeCharCodes(text string) string {
 
 // parses user content to generate an html output
 func (ts *TemplateStore) Parse(text string) (string, error) {
-	fmt.Printf("\nParse Input:\n%s\n\n", text)
-
 	// sucks that we have to do this, but self referential ascii recursion lol
 	normalized := ts.NormalizeCharCodes(text)
 
-	str, err := ts.ReplaceChars(normalized)
+	content := normalized
+
+	content, err := ts.ReplaceChars(content)
 	if err != nil {
 		return "", err
 	}
 
-	fmt.Printf("\nResult after ReplaceChars:\n%s\n\n", str)
-
-	paras, err := ts.WrapParagraphs(str)
+	content, err = ts.WrapParagraphs(content)
 	if err != nil {
 		return "", err
 	}
 
-	postlinks, err := ts.ParsePostLinks(paras)
+	content, err = ts.WrapQuotes(content)
 	if err != nil {
 		return "", err
 	}
 
-	quotes, err := ts.WrapQuotes(postlinks)
+	content, err = ts.ParsePostLinks(content)
 	if err != nil {
 		return "", err
 	}
 
-	wrapped, err := ts.WrapContent(quotes)
+	content, err = ts.WrapContent(content)
 	if err != nil {
 		return "", err
 	}
 
-	return wrapped, nil
+	return content, nil
 }
 
 func (ts *TemplateStore) executeTemplateParagraph(text string) string {
+	if text == "" {
+		return ""
+	}
+
 	t, ok := ts.Text["paragraph"]
 	if !ok {
 		panic("paragraph template is unresolvable")

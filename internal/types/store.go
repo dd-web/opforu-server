@@ -430,6 +430,23 @@ func (s *Store) FindSession(id string) (*Session, error) {
 	return session, nil
 }
 
+// Update the provided session
+// uses provided session's ID to determine which to update
+// - accepts a pointer to the session
+// - returns an error if one occurred, else nil
+func (s *Store) UpdateSession(session *Session) error {
+	collection := s.DB.Collection("sessions")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	filter := bson.D{{Key: "_id", Value: session.ID}}
+	_, err := collection.ReplaceOne(ctx, filter, session)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 /*******************************************************************************************
  * Asset Operations
  *******************************************************************************************/

@@ -95,3 +95,33 @@ func (ih *InternalHandler) HandleGetPost(rc *types.RequestCtx) error {
 
 	return ResolveResponse(rc)
 }
+
+// METHOD: GET
+// PATH: /api/internal/thread/{board_short}/{thread_slug}
+func (ih *InternalHandler) HandleGetThread(rc *types.RequestCtx) error {
+	rc.UpdateStore(ih.rh.Store)
+	vars := mux.Vars(rc.Request)
+
+	thread, err := rc.Store.FindThreadBySlug(vars["thread_slug"])
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorNotFound("thread"))
+	}
+
+	board, err := rc.Store.FindBoardByObjectID(thread.Board)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorNotFound("thread's board"))
+	}
+
+	t, err := rc.Store.RunAggregation("threads", builder.QrStrLookupThread(thread.Slug, board.ID, board.Short))
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorNotFound("thread"))
+	}
+
+	if len(t) == 0 || t[0] == nil {
+		return ResolveResponseErr(rc, types.ErrorNotFound("thread"))
+	}
+
+	rc.AddToResponseList("thread", t[0])
+
+	return ResolveResponse(rc)
+}

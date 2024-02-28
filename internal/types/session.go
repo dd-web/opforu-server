@@ -70,7 +70,7 @@ func (s *Session) IsExpired() bool {
 
 // will the session expire within the next hour?
 func (s *Session) IsExpiringSoon() bool {
-	return s.Expires.Before(time.Now().Add(-time.Duration(time.Minute * 60)))
+	return s.Expires.Before(time.Now().Add(-time.Duration(time.Minute * 60 * 24 * 7))) // 7 days
 }
 
 // is the session expiring in the next 5 minutes?

@@ -37,6 +37,14 @@ type RUMThread struct {
 	Title   string               `json:"title"`
 	Content string               `json:"content"`
 	Assets  []RUMAssetAttachment `json:"assets"`
+	Flags   RUMThreadFlags       `json:"flags"`
+}
+
+type RUMThreadFlags struct {
+	NSFW   bool   `json:"nsfw"`
+	NSFL   bool   `json:"nsfl"`
+	Images string `json:"images"`
+	Text   string `json:"text"`
 }
 
 func NewRUMThread() *RUMThread {
@@ -44,6 +52,7 @@ func NewRUMThread() *RUMThread {
 		Title:   "",
 		Content: "",
 		Assets:  make([]RUMAssetAttachment, 0),
+		Flags:   RUMThreadFlags{},
 	}
 }
 

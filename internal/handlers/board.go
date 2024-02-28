@@ -165,6 +165,7 @@ func (bh *BoardHandler) handleNewThread(rc *types.RequestCtx) error {
 
 	thread := types.NewThread()
 
+	thread.AttachFlags(details.Flags)
 	newIdentity.Thread = thread.ID
 	thread.Title = details.Title
 	thread.Body = str
@@ -181,6 +182,11 @@ func (bh *BoardHandler) handleNewThread(rc *types.RequestCtx) error {
 		if err != nil {
 			return ResolveResponseErr(rc, types.ErrorUnexpected())
 		}
+	}
+
+	err = thread.Validate()
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorInvalid(err.Error()))
 	}
 
 	err = rc.Store.SaveNewSingle(newIdentity, "identities")

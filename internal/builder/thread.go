@@ -39,3 +39,22 @@ func QrStrEntireThread(slug string, cfg *types.QueryCtx) bson.A {
 		QrStrLookupAssets("assets"),
 	}
 }
+
+// singular thread lookup - models in the shape of post
+func QrStrLookupThread(slug string, boardID primitive.ObjectID, boardShort string) bson.A {
+	pipe := bson.D{}
+	pipe = append(pipe, BsonE("slug", slug))
+	pipe = append(pipe, BsonE("board", boardID))
+
+	return bson.A{
+		BsonD("$match", pipe),
+		BsonD("$limit", 1),
+		QrStrLookupAssets("assets"),
+		QrStrLookupIdentity("creator"),
+		BsonOperator("$addFields", "creator", BsonOperWithArray("$arrayElemAt", []interface{}{"$creator", 0})),
+		BsonOperator("$addFields", "thread", slug),
+		BsonOperator("$addFields", "board", boardShort),
+		BsonOperator("$addFields", "post_count", BsonD("$size", "$posts")),
+		BsonOperWithArray("$unset", []interface{}{"account", "_id", "creator._id", "flags", "posts"}),
+	}
+}
