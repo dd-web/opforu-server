@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/dd-web/opforu-server/internal/builder"
 	"github.com/dd-web/opforu-server/internal/types"
 	"github.com/dd-web/opforu-server/internal/utils"
 	"go.mongodb.org/mongo-driver/bson"
@@ -181,7 +182,7 @@ func (ah *AccountHandler) RegisterAccountLogout(rc *types.RequestCtx) error {
 	case "POST":
 		return ah.handlePostAccountLogout(rc)
 	default:
-		return HandleUnsupportedMethod(rc.Writer, rc.Request)
+		return ResolveResponseErr(rc, types.ErrorUnsupported())
 	}
 }
 
@@ -220,4 +221,36 @@ func (ah *AccountHandler) handlePostAccountLogout(rc *types.RequestCtx) error {
 
 	// bypass the response resolver so it doesn't auto populate the deleted session
 	return HandleSendJSON(rc.Writer, http.StatusOK, bson.M{"message": "logged out"}, rc)
+}
+
+/***********************************************************************************************/
+/* ROOT path: host.com/api/account/posts
+/***********************************************************************************************/
+func (ah *AccountHandler) RegisterAccountPosts(rc *types.RequestCtx) error {
+	rc.UpdateStore(ah.rh.Store)
+
+	switch rc.Request.Method {
+	case "GET":
+		return ah.handleGetRecentPosts(rc)
+	default:
+		return ResolveResponseErr(rc, types.ErrorUnsupported())
+	}
+}
+
+// METHOD: GET
+// PATH: host.com/api/account/posts
+func (ah *AccountHandler) handleGetRecentPosts(rc *types.RequestCtx) error {
+	if rc.UnresolvedAccount {
+		return ResolveResponseErr(rc, types.ErrorUnauthorized())
+	}
+
+	pipe := builder.QrStrLookupAccountRecentIdentities(rc.AccountCtx.Account.ID)
+	result, err := rc.Store.RunAggregation("identities", pipe)
+	if err != nil {
+		return ResolveResponseErr(rc, types.ErrorUnexpected())
+	}
+
+	rc.AddToResponseList("result", result)
+
+	return ResolveResponse(rc)
 }

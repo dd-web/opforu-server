@@ -50,7 +50,7 @@ type Session struct {
 func NewSession(account *Account) *Session {
 	id := uuid.NewString()
 	ts := time.Now().UTC()
-	exp := time.Now().Add(time.Duration(time.Hour * 24)).UTC()
+	exp := time.Now().Add(time.Duration(time.Hour * 24 * 7)).UTC() // 1 week vailidity
 
 	return &Session{
 		ID:        primitive.NewObjectID(),
@@ -70,7 +70,7 @@ func (s *Session) IsExpired() bool {
 
 // will the session expire within the next hour?
 func (s *Session) IsExpiringSoon() bool {
-	return s.Expires.Before(time.Now().Add(-time.Duration(time.Minute * 60 * 24 * 7))) // 7 days
+	return s.Expires.Before(time.Now().Add(-time.Duration(time.Minute * 60 * 24))) // 1 day refresh
 }
 
 // is the session expiring in the next 5 minutes?

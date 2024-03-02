@@ -94,6 +94,10 @@ func (th *ThreadHandler) handleThreadReply(rc *types.RequestCtx) error {
 	newPostAssets := []*types.Asset{}
 	newPostAssetInterfaces := []interface{}{}
 
+	if thread.HasFlag(types.TF_MEDIAREQ) && len(details.Assets) == 0 {
+		return ResolveResponseErr(rc, types.ErrorInvalid("thread requires media in replies"))
+	}
+
 	if len(details.Assets) > 0 {
 		for _, v := range details.Assets {
 			a := types.NewAsset(v.SourceID, rc.AccountCtx.Account.ID)

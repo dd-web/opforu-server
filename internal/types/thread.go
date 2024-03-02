@@ -89,12 +89,9 @@ const (
 type ThreadFlag string
 
 const (
-	TF_NSFW   ThreadFlag = "nsfw"
-	TF_NSFL   ThreadFlag = "nsfl"
-	TF_REQIMG ThreadFlag = "require_image"
-	TF_REQTXT ThreadFlag = "require_text"
-	TF_FBDIMG ThreadFlag = "forbid_image"
-	TF_FBDTXT ThreadFlag = "forbid_text"
+	TF_NSFW     ThreadFlag = "nsfw"
+	TF_NSFL     ThreadFlag = "nsfl"
+	TF_MEDIAREQ ThreadFlag = "media_required"
 )
 
 // ClientFormatter implementation
@@ -115,26 +112,15 @@ func (t *Thread) CLFormat() bson.M {
 }
 
 // for now use strings - eventually use bitfields for performance
-func (t *Thread) AttachFlags(rft RUMThreadFlags) {
+func (t *Thread) AttachFlags(rft *RUMThreadFlags) {
 	if rft.NSFW {
 		t.Flags = append(t.Flags, TF_NSFW)
 	}
 	if rft.NSFL {
 		t.Flags = append(t.Flags, TF_NSFL)
 	}
-
-	switch rft.Images {
-	case "required":
-		t.Flags = append(t.Flags, TF_REQIMG)
-	case "forbid":
-		t.Flags = append(t.Flags, TF_FBDIMG)
-	}
-
-	switch rft.Text {
-	case "required":
-		t.Flags = append(t.Flags, TF_REQTXT)
-	case "forbid":
-		t.Flags = append(t.Flags, TF_FBDTXT)
+	if rft.REQMEDIA {
+		t.Flags = append(t.Flags, TF_MEDIAREQ)
 	}
 }
 
@@ -148,33 +134,10 @@ func (t *Thread) HasFlag(flag ThreadFlag) bool {
 }
 
 func (t *Thread) Validate() error {
-
 	if len(t.Title) < 2 {
 		return fmt.Errorf("Thread title is too short")
 	} else if len(t.Title) > 120 {
 		return fmt.Errorf("Thread title is too long")
-	}
-
-	if t.HasFlag(TF_FBDTXT) && len(t.Body) > 0 {
-		return fmt.Errorf("Thread forbids text")
-	}
-
-	if t.HasFlag(TF_FBDIMG) && len(t.Assets) > 0 {
-		return fmt.Errorf("Thread forbids assets")
-	}
-
-	if t.HasFlag(TF_REQIMG) && len(t.Assets) == 0 {
-		return fmt.Errorf("Thread requires assets")
-	}
-
-	if t.HasFlag(TF_REQTXT) && len(t.Body) == 0 {
-		return fmt.Errorf("Thread required content")
-	}
-
-	if !t.HasFlag(TF_FBDTXT) && len(t.Body) < 5 {
-		return fmt.Errorf("Thread body is too short")
-	} else if len(t.Body) > 4200 {
-		return fmt.Errorf("Thread body is too long")
 	}
 
 	if len(t.Slug) < THREAD_MIN_SLUG_LEN {

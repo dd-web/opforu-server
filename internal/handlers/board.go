@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"time"
 
@@ -165,13 +166,16 @@ func (bh *BoardHandler) handleNewThread(rc *types.RequestCtx) error {
 
 	thread := types.NewThread()
 
-	thread.AttachFlags(details.Flags)
+	thread.AttachFlags(&details.Flags)
+
 	newIdentity.Thread = thread.ID
 	thread.Title = details.Title
 	thread.Body = str
 	thread.Board = board.ID
 	thread.Creator = newIdentity.ID
 	thread.Mods = []primitive.ObjectID{newIdentity.ID}
+
+	fmt.Printf("\nNew Thread:\n%+v\n", thread)
 
 	if len(details.Assets) > 0 {
 		for _, v := range newThreadAssets {
@@ -186,6 +190,7 @@ func (bh *BoardHandler) handleNewThread(rc *types.RequestCtx) error {
 
 	err = thread.Validate()
 	if err != nil {
+		fmt.Printf("Validation err: %+v", err.Error())
 		return ResolveResponseErr(rc, types.ErrorInvalid(err.Error()))
 	}
 

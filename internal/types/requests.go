@@ -41,10 +41,9 @@ type RUMThread struct {
 }
 
 type RUMThreadFlags struct {
-	NSFW   bool   `json:"nsfw"`
-	NSFL   bool   `json:"nsfl"`
-	Images string `json:"images"`
-	Text   string `json:"text"`
+	NSFW     bool `json:"nsfw"`
+	NSFL     bool `json:"nsfl"`
+	REQMEDIA bool `json:"media_required"`
 }
 
 func NewRUMThread() *RUMThread {
@@ -52,7 +51,11 @@ func NewRUMThread() *RUMThread {
 		Title:   "",
 		Content: "",
 		Assets:  make([]RUMAssetAttachment, 0),
-		Flags:   RUMThreadFlags{},
+		Flags: RUMThreadFlags{
+			NSFW:     false,
+			NSFL:     false,
+			REQMEDIA: false,
+		},
 	}
 }
 

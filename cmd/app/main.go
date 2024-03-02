@@ -44,6 +44,7 @@ func main() {
 	fmt.Println("Registering handlers...")
 
 	// account
+	handler.Router.HandleFunc("/api/account/posts", handlers.WrapFn(handler_account.RegisterAccountPosts))
 	handler.Router.HandleFunc("/api/account/logout", handlers.WrapFn(handler_account.RegisterAccountLogout))
 	handler.Router.HandleFunc("/api/account/login", handlers.WrapFn(handler_account.RegisterAccountLogin))
 	handler.Router.HandleFunc("/api/account/register", handlers.WrapFn(handler_account.RegisterAccountRegister))

@@ -14,6 +14,7 @@ const (
 	Error_NotFound     ServerError = "not found"
 	Error_Invalid      ServerError = "invalid"
 	Error_Unauthorized ServerError = "unauthorized"
+	Error_Unsupported  ServerError = "unsupported method"
 )
 
 // Status codes mapped to their respective ServerError
@@ -82,4 +83,9 @@ func ErrorUnauthorized() APIError {
 // New Unexpected Error
 func ErrorUnexpected() APIError {
 	return *NewAPIError(http.StatusInternalServerError, Error_Unexpected.String())
+}
+
+// New Unsupported Method Error
+func ErrorUnsupported() APIError {
+	return *NewAPIError(http.StatusMethodNotAllowed, Error_Unsupported.String())
 }
